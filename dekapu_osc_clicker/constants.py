@@ -1,4 +1,8 @@
-APP_TITLE = "dekapu-osc-clicker"
+import os
+
+BASE_APP_TITLE = "dekapu-osc-clicker"
+APP_VERSION = os.getenv("DEKAPU_OSC_CLICKER_VERSION", "").strip()
+APP_TITLE = f"{BASE_APP_TITLE} {APP_VERSION}" if APP_VERSION else BASE_APP_TITLE
 WINDOW_SIZE = "540x280"
 
 VRCHAT_OSC_IP = "127.0.0.1"

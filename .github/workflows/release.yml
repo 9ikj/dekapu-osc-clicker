@@ -38,7 +38,7 @@ jobs:
 
       - name: Build executable
         shell: pwsh
-        run: ./build.ps1
+        run: ./build.ps1 -Version "${{ github.event.inputs.tag }}"
 
       - name: Rename executable for release
         shell: pwsh
