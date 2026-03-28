@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(printf '\\\\n---\\\\n')",
+      "Bash(git init:*)"
+    ]
+  }
+}
