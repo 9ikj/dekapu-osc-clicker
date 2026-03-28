@@ -7,7 +7,7 @@ from .settings import SettingsStore
 from .ui import MainWindow
 
 
-class MassiveMedalPusherApp:
+class DekapuOscClickerApp:
     def __init__(self):
         self.settings = SettingsStore()
         self.osc_client = VRChatOSCClient()
@@ -78,7 +78,7 @@ class MassiveMedalPusherApp:
 
 
 def main():
-    app = MassiveMedalPusherApp()
+    app = DekapuOscClickerApp()
     ui = MainWindow(app)
     app.attach_ui(ui)
     app.register_hotkeys()

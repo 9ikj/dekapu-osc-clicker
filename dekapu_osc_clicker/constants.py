@@ -1,4 +1,4 @@
-APP_TITLE = "Massive Medal Pusher工具"
+APP_TITLE = "dekapu-osc-clicker"
 WINDOW_SIZE = "540x280"
 
 VRCHAT_OSC_IP = "127.0.0.1"

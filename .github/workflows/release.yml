@@ -1,0 +1,81 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (for example v1.0.0)
+        required: true
+      release_name:
+        description: Release name
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: Rename executable for release
+        shell: pwsh
+        run: |
+          Rename-Item -Path "dist/dekapu-osc-clicker.exe" -NewName "dekapu-osc-clicker-${{ github.event.inputs.tag }}-windows.exe"
+
+      - name: Generate release notes body
+        id: release_notes
+        shell: pwsh
+        run: |
+          $currentTag = "${{ github.event.inputs.tag }}"
+          $previousTag = git tag --sort=-v:refname | Where-Object { $_ -ne $currentTag } | Select-Object -First 1
+
+          if ($previousTag) {
+            $compareRange = "$previousTag..HEAD"
+            $header = "## Changes since $previousTag"
+          }
+          else {
+            $compareRange = "HEAD"
+            $header = "## Changes"
+          }
+
+          $changes = git log $compareRange --pretty=format:"- %h %s"
+          if (-not $changes) {
+            $changes = "- No changes found"
+          }
+
+          @"
+          $header
+
+          $changes
+          "@ | Out-File -FilePath release-notes.md -Encoding utf8
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.release_name }}
+          body_path: release-notes.md
+          files: dist/dekapu-osc-clicker-${{ github.event.inputs.tag }}-windows.exe

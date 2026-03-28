@@ -1,4 +1,4 @@
-# Massive Medal Pusher工具
+# dekapu-osc-clicker
 
 这是一个用于 VRChat OSC 的桌面工具，带图形界面，支持自动左键连点、读取 VRChat 日志中的 DSM SaveURL、提取 `sp` 并自动发送到 VRChat 聊天框。
 
@@ -33,13 +33,13 @@ pip install -r requirements.txt
 兼容旧入口：
 
 ```bash
-python vrchat_osc_clicker.py
+python dekapu_osc_clicker.py
 ```
 
 包入口：
 
 ```bash
-python -m massive_medal_pusher
+python -m dekapu_osc_clicker
 ```
 
 ## 使用说明
@@ -99,8 +99,8 @@ settings.json
 ├─ README.md
 ├─ requirements.txt
 ├─ settings.json
-├─ vrchat_osc_clicker.py
-└─ massive_medal_pusher/
+├─ dekapu_osc_clicker.py
+└─ dekapu_osc_clicker/
    ├─ __init__.py
    ├─ __main__.py
    ├─ app.py
