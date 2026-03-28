@@ -6,9 +6,6 @@ on:
       tag:
         description: Release tag (for example v1.0.0)
         required: true
-      release_name:
-        description: Release name
-        required: true
 
 permissions:
   contents: write
@@ -76,6 +73,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag }}
-          name: ${{ github.event.inputs.release_name }}
+          name: dekapu-osc-clicker ${{ github.event.inputs.tag }}
           body_path: release-notes.md
           files: dist/dekapu-osc-clicker-${{ github.event.inputs.tag }}-windows.exe
