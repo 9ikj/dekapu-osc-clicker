@@ -24,12 +24,6 @@ class LogMonitor:
     def _debug_log(message):
         print(f"[log_monitor] {message}")
 
-    @staticmethod
-    def _format_scaled_value(value, divisor, suffix):
-        scaled = value / divisor
-        text = f"{scaled:.1f}".rstrip("0").rstrip(".")
-        return f"{text}{suffix}"
-
     def _format_number(self, sp_value, language):
         try:
             value = int(sp_value)
@@ -37,32 +31,36 @@ class LogMonitor:
             return str(sp_value)
 
         if language == "en":
-            if value >= 1_000_000_000_000:
-                return self._format_scaled_value(value, 1_000_000_000_000, "T")
-            if value >= 1_000_000_000:
-                return self._format_scaled_value(value, 1_000_000_000, "B")
-            if value >= 1_000_000:
-                return self._format_scaled_value(value, 1_000_000, "M")
-            if value >= 1_000:
-                return self._format_scaled_value(value, 1_000, "K")
-            return str(value)
+            units = [
+                (1_000_000_000_000, "T"),
+                (1_000_000_000, "B"),
+                (1_000_000, "M"),
+                (1_000, "K"),
+            ]
+        elif language == "ja":
+            units = [
+                (1_000_000_000_000, "兆"),
+                (100_000_000, "億"),
+                (10_000, "万"),
+            ]
+        else:
+            units = [
+                (1_000_000_000_000, "万亿"),
+                (100_000_000, "亿"),
+                (10_000, "万"),
+            ]
 
-        if language == "ja":
-            if value >= 1_000_000_000_000:
-                return self._format_scaled_value(value, 1_000_000_000_000, "兆")
-            if value >= 100_000_000:
-                return self._format_scaled_value(value, 100_000_000, "億")
-            if value >= 10_000:
-                return self._format_scaled_value(value, 10_000, "万")
-            return str(value)
+        parts = []
+        remaining = value
+        for divisor, suffix in units:
+            amount, remaining = divmod(remaining, divisor)
+            if amount:
+                parts.append(f"{amount}{suffix}")
 
-        if value >= 1_000_000_000_000:
-            return self._format_scaled_value(value, 1_000_000_000_000, "万亿")
-        if value >= 100_000_000:
-            return self._format_scaled_value(value, 100_000_000, "亿")
-        if value >= 10_000:
-            return self._format_scaled_value(value, 10_000, "万")
-        return str(value)
+        if remaining or not parts:
+            parts.append(str(remaining))
+
+        return "".join(parts)
 
     def _build_sp_message(self, sp_value, advance=False):
         if not self.selected_languages:
@@ -72,11 +70,11 @@ class LogMonitor:
         formatted_value = self._format_number(sp_value, language)
 
         if language == "en":
-            message = f"Current SP: {formatted_value}"
+            message = f"Remaining SP: {formatted_value}"
         elif language == "ja":
-            message = f"現在のSP: {formatted_value}"
+            message = f"残りSP: {formatted_value}"
         else:
-            message = f"当前sp:{formatted_value}"
+            message = f"剩余SP:{formatted_value}"
 
         if advance:
             self.language_index = (self.language_index + 1) % len(self.selected_languages)
