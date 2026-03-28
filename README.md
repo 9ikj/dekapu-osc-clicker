@@ -127,6 +127,10 @@ settings.json
 ### 3. 找不到日志文件
 - 确认选择的是 VRChat 的日志目录，而不是上一级目录
 
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
 ## 说明
 
 当前项目已经按模块拆分，便于后续继续维护、打包和扩展。
