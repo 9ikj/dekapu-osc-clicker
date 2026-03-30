@@ -30,8 +30,11 @@ class MainWindow:
         frame = tk.Frame(self.root, padx=16, pady=16)
         frame.pack(fill="both", expand=True)
 
+        min_delay_ms, max_delay_ms = self.app.get_click_delay_limits_ms()
+
         tk.Label(frame, text="点击频率（ms）").grid(row=0, column=0, sticky="w")
         tk.Entry(frame, textvariable=self.delay_var, width=18).grid(row=0, column=1, sticky="ew", padx=(8, 0))
+        tk.Label(frame, text=f"范围：{min_delay_ms}-{max_delay_ms} ms").grid(row=0, column=2, sticky="w", padx=(8, 0))
 
         tk.Label(frame, text="VRChat 日志目录").grid(row=1, column=0, sticky="w", pady=(12, 0))
         tk.Entry(frame, textvariable=self.log_dir_var).grid(row=1, column=1, sticky="ew", padx=(8, 8), pady=(12, 0))
@@ -50,11 +53,11 @@ class MainWindow:
         language_frame = tk.Frame(frame)
         language_frame.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
         tk.Label(language_frame, text="发送语言：").pack(side="left")
-        tk.Checkbutton(language_frame, text="中文", variable=self.language_zh_var, command=self._save_languages).pack(side="left")
-        tk.Checkbutton(language_frame, text="英语", variable=self.language_en_var, command=self._save_languages).pack(side="left")
-        tk.Checkbutton(language_frame, text="日语", variable=self.language_ja_var, command=self._save_languages).pack(side="left")
+        tk.Checkbutton(language_frame, text="中文", variable=self.language_zh_var, command=lambda: self._on_language_toggle("zh")).pack(side="left")
+        tk.Checkbutton(language_frame, text="英语", variable=self.language_en_var, command=lambda: self._on_language_toggle("en")).pack(side="left")
+        tk.Checkbutton(language_frame, text="日语", variable=self.language_ja_var, command=lambda: self._on_language_toggle("ja")).pack(side="left")
 
-        tk.Label(frame, textvariable=self.status_var, anchor="w", justify="left", wraplength=490).grid(row=7, column=0, columnspan=3, sticky="ew", pady=(16, 0))
+        tk.Label(frame, textvariable=self.status_var, anchor="w", justify="left", wraplength=620).grid(row=7, column=0, columnspan=3, sticky="ew", pady=(16, 0))
 
         frame.columnconfigure(1, weight=1)
 
@@ -99,13 +102,29 @@ class MainWindow:
             languages.append("ja")
         return languages
 
-    def _save_languages(self):
-        self.app.save_languages(self.get_selected_languages())
+    def _ensure_at_least_one_language(self, preferred_language=None):
+        selected = self.get_selected_languages()
+        if selected:
+            return selected
+
+        if preferred_language == "en":
+            self.language_en_var.set(True)
+        elif preferred_language == "ja":
+            self.language_ja_var.set(True)
+        else:
+            self.language_zh_var.set(True)
+
+        messagebox.showwarning("提示", "至少需要保留一种发送语言")
+        return self.get_selected_languages()
+
+    def _on_language_toggle(self, preferred_language):
+        languages = self._ensure_at_least_one_language(preferred_language)
+        self.app.save_languages(languages)
 
     def _toggle_monitoring(self):
         if self.monitor_var.get():
             try:
-                selected_languages = self.get_selected_languages()
+                selected_languages = self._ensure_at_least_one_language("zh")
                 self.app.save_languages(selected_languages)
                 self.app.start_monitoring(self.log_dir_var.get().strip(), selected_languages)
             except ValueError as exc:

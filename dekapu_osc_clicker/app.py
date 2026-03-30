@@ -3,7 +3,7 @@ from keyboard import add_hotkey, remove_hotkey
 from .clicker import ClickerController
 from .log_monitor import LogMonitor
 from .osc_client import VRChatOSCClient
-from .settings import SettingsStore
+from .settings import MAX_CLICK_DELAY_MS, MIN_CLICK_DELAY_MS, SettingsStore
 from .ui import MainWindow
 
 
@@ -41,12 +41,20 @@ class DekapuOscClickerApp:
     def save_languages(self, languages):
         self.settings.set_languages(languages)
 
+    @staticmethod
+    def get_click_delay_limits_ms():
+        return MIN_CLICK_DELAY_MS, MAX_CLICK_DELAY_MS
+
     def apply_click_delay(self, raw_value):
         delay_seconds = self.clicker.apply_delay(raw_value)
-        return int(round(delay_seconds * 1000))
+        delay_ms = int(round(delay_seconds * 1000))
+        if delay_ms < MIN_CLICK_DELAY_MS or delay_ms > MAX_CLICK_DELAY_MS:
+            raise ValueError(f"点击频率必须在 {MIN_CLICK_DELAY_MS}-{MAX_CLICK_DELAY_MS} ms 之间")
+        return delay_ms
 
     def start_clicking(self, raw_value):
-        self.clicker.start(raw_value)
+        delay_ms = self.apply_click_delay(raw_value)
+        self.clicker.start(str(delay_ms))
 
     def stop_clicking(self):
         self.clicker.stop()

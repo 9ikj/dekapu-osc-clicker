@@ -3,6 +3,9 @@ import sys
 from pathlib import Path
 
 
+MIN_CLICK_DELAY_MS = 10
+MAX_CLICK_DELAY_MS = 60000
+VALID_LANGUAGES = ("zh", "en", "ja")
 DEFAULT_SETTINGS = {
     "log_dir": "",
     "click_delay_ms": 200,
@@ -42,6 +45,11 @@ class SettingsStore:
         merged = DEFAULT_SETTINGS.copy()
         if isinstance(settings, dict):
             merged.update(settings)
+
+        merged["click_delay_ms"] = self._sanitize_click_delay_ms(merged.get("click_delay_ms"))
+        merged["languages"] = self._sanitize_languages(merged.get("languages"))
+        merged["log_dir"] = str(merged.get("log_dir", "") or "")
+
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self.file_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -50,6 +58,21 @@ class SettingsStore:
         settings.update(kwargs)
         self.save(settings)
         return settings
+
+    @staticmethod
+    def _sanitize_click_delay_ms(value):
+        try:
+            click_delay_ms = int(float(value))
+        except (TypeError, ValueError):
+            click_delay_ms = DEFAULT_SETTINGS["click_delay_ms"]
+        return max(MIN_CLICK_DELAY_MS, min(MAX_CLICK_DELAY_MS, click_delay_ms))
+
+    @staticmethod
+    def _sanitize_languages(languages):
+        if not isinstance(languages, list):
+            return DEFAULT_SETTINGS["languages"][:]
+        valid = [lang for lang in languages if lang in VALID_LANGUAGES]
+        return valid or DEFAULT_SETTINGS["languages"][:]
 
     def get_log_dir(self):
         saved_log_dir = self.load().get("log_dir", "")
@@ -61,18 +84,13 @@ class SettingsStore:
         self.update(log_dir=log_dir)
 
     def get_click_delay_ms(self):
-        return int(self.load().get("click_delay_ms", DEFAULT_SETTINGS["click_delay_ms"]))
+        return self._sanitize_click_delay_ms(self.load().get("click_delay_ms", DEFAULT_SETTINGS["click_delay_ms"]))
 
     def set_click_delay_ms(self, click_delay_ms):
-        self.update(click_delay_ms=int(click_delay_ms))
+        self.update(click_delay_ms=self._sanitize_click_delay_ms(click_delay_ms))
 
     def get_languages(self):
-        languages = self.load().get("languages", DEFAULT_SETTINGS["languages"])
-        if not isinstance(languages, list):
-            return DEFAULT_SETTINGS["languages"][:]
-        valid = [lang for lang in languages if lang in {"zh", "en", "ja"}]
-        return valid or DEFAULT_SETTINGS["languages"][:]
+        return self._sanitize_languages(self.load().get("languages", DEFAULT_SETTINGS["languages"]))
 
     def set_languages(self, languages):
-        valid = [lang for lang in languages if lang in {"zh", "en", "ja"}]
-        self.update(languages=valid or DEFAULT_SETTINGS["languages"][:])
+        self.update(languages=self._sanitize_languages(languages))
