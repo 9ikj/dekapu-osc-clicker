@@ -1,7 +1,7 @@
 from threading import Event, Thread
 from time import monotonic, sleep
 
-from .constants import DEFAULT_CLICK_DELAY, DEFAULT_CLICK_PRESS_DURATION
+from .constants import DEFAULT_CLICK_DELAY_MS, DEFAULT_CLICK_PRESS_DURATION
 
 
 class ClickerController:
@@ -11,14 +11,14 @@ class ClickerController:
         self.stop_event = Event()
         self.worker = None
         self.running = False
-        self.click_delay = DEFAULT_CLICK_DELAY
+        self.click_delay = DEFAULT_CLICK_DELAY_MS / 1000.0
         self.press_duration = DEFAULT_CLICK_PRESS_DURATION
 
     def _set_status(self, text):
         self.status_callback(text)
 
     def _running_status_text(self):
-        return f"状态：运行中，间隔 {self.click_delay:.3f} 秒，按下 {self.press_duration:.3f} 秒"
+        return f"状态：运行中，间隔 {self.click_delay * 1000:.0f} ms，按下 {self.press_duration * 1000:.0f} ms"
 
     def _click_loop(self):
         next_click_time = monotonic()
@@ -46,12 +46,12 @@ class ClickerController:
         try:
             value = float(raw_value)
         except ValueError as exc:
-            raise ValueError("延迟必须是数字") from exc
+            raise ValueError("点击频率必须是数字") from exc
 
         if value <= 0:
-            raise ValueError("延迟必须大于 0")
+            raise ValueError("点击频率必须大于 0 ms")
 
-        return value
+        return value / 1000.0
 
     def apply_delay(self, raw_value):
         self.click_delay = self.validate_delay(raw_value)

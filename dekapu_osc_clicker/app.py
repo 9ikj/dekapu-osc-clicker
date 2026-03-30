@@ -29,8 +29,21 @@ class DekapuOscClickerApp:
     def save_log_dir(self, log_dir):
         self.settings.set_log_dir(log_dir)
 
+    def get_saved_click_delay_ms(self):
+        return self.settings.get_click_delay_ms()
+
+    def save_click_delay_ms(self, click_delay_ms):
+        self.settings.set_click_delay_ms(click_delay_ms)
+
+    def get_saved_languages(self):
+        return self.settings.get_languages()
+
+    def save_languages(self, languages):
+        self.settings.set_languages(languages)
+
     def apply_click_delay(self, raw_value):
-        return self.clicker.apply_delay(raw_value)
+        delay_seconds = self.clicker.apply_delay(raw_value)
+        return int(round(delay_seconds * 1000))
 
     def start_clicking(self, raw_value):
         self.clicker.start(raw_value)

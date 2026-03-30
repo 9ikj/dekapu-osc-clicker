@@ -3,6 +3,13 @@ import sys
 from pathlib import Path
 
 
+DEFAULT_SETTINGS = {
+    "log_dir": "",
+    "click_delay_ms": 200,
+    "languages": ["zh", "en", "ja"],
+}
+
+
 def get_settings_file():
     if getattr(sys, "frozen", False):
         base_dir = Path(sys.executable).resolve().parent
@@ -18,17 +25,31 @@ class SettingsStore:
         self.file_path = Path(file_path) if file_path is not None else get_settings_file()
 
     def load(self):
+        settings = DEFAULT_SETTINGS.copy()
         if not self.file_path.exists():
-            return {}
+            return settings
 
         try:
-            return json.loads(self.file_path.read_text(encoding="utf-8"))
+            loaded = json.loads(self.file_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return {}
+            return settings
+
+        if isinstance(loaded, dict):
+            settings.update(loaded)
+        return settings
 
     def save(self, settings):
+        merged = DEFAULT_SETTINGS.copy()
+        if isinstance(settings, dict):
+            merged.update(settings)
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        self.file_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.file_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def update(self, **kwargs):
+        settings = self.load()
+        settings.update(kwargs)
+        self.save(settings)
+        return settings
 
     def get_log_dir(self):
         saved_log_dir = self.load().get("log_dir", "")
@@ -37,4 +58,21 @@ class SettingsStore:
         return str(Path(saved_log_dir))
 
     def set_log_dir(self, log_dir):
-        self.save({"log_dir": log_dir})
+        self.update(log_dir=log_dir)
+
+    def get_click_delay_ms(self):
+        return int(self.load().get("click_delay_ms", DEFAULT_SETTINGS["click_delay_ms"]))
+
+    def set_click_delay_ms(self, click_delay_ms):
+        self.update(click_delay_ms=int(click_delay_ms))
+
+    def get_languages(self):
+        languages = self.load().get("languages", DEFAULT_SETTINGS["languages"])
+        if not isinstance(languages, list):
+            return DEFAULT_SETTINGS["languages"][:]
+        valid = [lang for lang in languages if lang in {"zh", "en", "ja"}]
+        return valid or DEFAULT_SETTINGS["languages"][:]
+
+    def set_languages(self, languages):
+        valid = [lang for lang in languages if lang in {"zh", "en", "ja"}]
+        self.update(languages=valid or DEFAULT_SETTINGS["languages"][:])

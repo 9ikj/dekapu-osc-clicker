@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from .constants import APP_TITLE, DEFAULT_CLICK_DELAY, WINDOW_SIZE
+from .constants import APP_TITLE, DEFAULT_CLICK_DELAY_MS, WINDOW_SIZE
 
 
 class MainWindow:
@@ -12,12 +12,14 @@ class MainWindow:
         self.root.geometry(WINDOW_SIZE)
         self.root.resizable(False, False)
 
-        self.delay_var = tk.StringVar(value=str(DEFAULT_CLICK_DELAY))
+        self.delay_var = tk.StringVar(value=str(self.app.get_saved_click_delay_ms() or DEFAULT_CLICK_DELAY_MS))
         self.log_dir_var = tk.StringVar(value=self.app.get_saved_log_dir())
         self.monitor_var = tk.BooleanVar(value=False)
-        self.language_zh_var = tk.BooleanVar(value=True)
-        self.language_en_var = tk.BooleanVar(value=True)
-        self.language_ja_var = tk.BooleanVar(value=True)
+
+        saved_languages = set(self.app.get_saved_languages())
+        self.language_zh_var = tk.BooleanVar(value="zh" in saved_languages)
+        self.language_en_var = tk.BooleanVar(value="en" in saved_languages)
+        self.language_ja_var = tk.BooleanVar(value="ja" in saved_languages)
         self.status_var = tk.StringVar(value="状态：已停止")
 
         self._build_ui()
@@ -28,7 +30,7 @@ class MainWindow:
         frame = tk.Frame(self.root, padx=16, pady=16)
         frame.pack(fill="both", expand=True)
 
-        tk.Label(frame, text="点击间隔（秒）").grid(row=0, column=0, sticky="w")
+        tk.Label(frame, text="点击频率（ms）").grid(row=0, column=0, sticky="w")
         tk.Entry(frame, textvariable=self.delay_var, width=18).grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
         tk.Label(frame, text="VRChat 日志目录").grid(row=1, column=0, sticky="w", pady=(12, 0))
@@ -48,9 +50,9 @@ class MainWindow:
         language_frame = tk.Frame(frame)
         language_frame.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
         tk.Label(language_frame, text="发送语言：").pack(side="left")
-        tk.Checkbutton(language_frame, text="中文", variable=self.language_zh_var).pack(side="left")
-        tk.Checkbutton(language_frame, text="英语", variable=self.language_en_var).pack(side="left")
-        tk.Checkbutton(language_frame, text="日语", variable=self.language_ja_var).pack(side="left")
+        tk.Checkbutton(language_frame, text="中文", variable=self.language_zh_var, command=self._save_languages).pack(side="left")
+        tk.Checkbutton(language_frame, text="英语", variable=self.language_en_var, command=self._save_languages).pack(side="left")
+        tk.Checkbutton(language_frame, text="日语", variable=self.language_ja_var, command=self._save_languages).pack(side="left")
 
         tk.Label(frame, textvariable=self.status_var, anchor="w", justify="left", wraplength=490).grid(row=7, column=0, columnspan=3, sticky="ew", pady=(16, 0))
 
@@ -64,7 +66,8 @@ class MainWindow:
 
     def _apply_click_delay(self, *_args):
         try:
-            self.app.apply_click_delay(self.delay_var.get())
+            click_delay_ms = self.app.apply_click_delay(self.delay_var.get())
+            self.app.save_click_delay_ms(click_delay_ms)
         except ValueError:
             return
 
@@ -96,10 +99,15 @@ class MainWindow:
             languages.append("ja")
         return languages
 
+    def _save_languages(self):
+        self.app.save_languages(self.get_selected_languages())
+
     def _toggle_monitoring(self):
         if self.monitor_var.get():
             try:
-                self.app.start_monitoring(self.log_dir_var.get().strip(), self.get_selected_languages())
+                selected_languages = self.get_selected_languages()
+                self.app.save_languages(selected_languages)
+                self.app.start_monitoring(self.log_dir_var.get().strip(), selected_languages)
             except ValueError as exc:
                 self.monitor_var.set(False)
                 self.set_status(f"状态：{exc}")
