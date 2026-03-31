@@ -69,10 +69,10 @@ class LogMonitor:
         formatted_today = self._format_number(today_used, language)
 
         if language == "en":
-            return f"Remaining SP: {formatted_remaining}\nToday SP: {formatted_today}"
+            return f"Current SP: {formatted_remaining}\nSP Used Today: {formatted_today}"
         if language == "ja":
-            return f"残りSP: {formatted_remaining}\n今日SP: {formatted_today}"
-        return f"剩余SP:{formatted_remaining}\n今日SP:{formatted_today}"
+            return f"現在SP: {formatted_remaining}\n本日使用SP: {formatted_today}"
+        return f"当前SP：{formatted_remaining}\n今日已用SP：{formatted_today}"
 
     def _get_current_language(self):
         if not self.selected_languages:
