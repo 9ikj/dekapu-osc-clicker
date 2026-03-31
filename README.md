@@ -1,6 +1,6 @@
 # dekapu-osc-clicker
 
-这是一个用于 VRChat OSC 的桌面工具，带图形界面，支持自动点击、读取 VRChat 日志中的 DSM SaveURL、提取 `sp` 并自动发送到 VRChat 聊天框。
+这是一个用于 VRChat OSC 的桌面工具，带图形界面，支持自动点击、读取 VRChat 日志中的 DSM SaveURL、提取 `sp`（Skill Points）并自动发送到 VRChat 聊天框。
 
 ## 功能
 
@@ -13,10 +13,10 @@
 - 选择 VRChat 日志目录后自动保存
 - 发送语言勾选状态会自动保存并在下次启动时恢复
 - 自动监听最新 `output_log_*.txt`
-- 发现新的 `[DSM SaveURL] Generated URL:` 后自动提取 `sp`
+- 发现新的 `[DSM SaveURL] Generated URL:` 后自动提取 `sp`（Skill Points）
 - 自动发送聊天框消息，支持中文 / 英语 / 日语轮换
-- 聊天框消息按换行显示“剩余SP”和“今日SP”
-- 今日SP按“当天软件第一次读取到的 SP”开始累计，重开软件后仍可继续计算
+- 聊天框消息按换行显示“剩余 Skill Points（剩余SP）”和“今日 Skill Points（今日SP）”
+- 今日 Skill Points（今日SP）按“当天软件第一次读取到的 Skill Points”开始累计，重开软件后仍可继续计算
 - 可勾选要参与发送的语言：中文 / 英语 / 日语（至少保留一种）
 - 英语使用 `K / M / B / T` 单位
 - 中文使用 `万 / 亿 / 万亿` 单位
@@ -56,7 +56,7 @@ python -m dekapu_osc_clicker
 3. 点击“浏览”选择 VRChat 日志目录
 4. 点击“开始”或按 `F1` 开始点击
 5. 点击“停止”或按 `F2` 停止点击
-6. 勾选“自动监听最新日志并发送SP”启用自动监听
+6. 勾选“自动监听最新日志并发送 Skill Points（SP）”启用自动监听
 7. 在界面中勾选要参与发送的语言：中文 / 英语 / 日语
 
 点击频率当前限制范围：
@@ -87,8 +87,8 @@ C:\Users\你的用户名\AppData\LocalLow\VRChat\VRChat
 3. 匹配 `[DSM SaveURL] Generated URL:`
 4. 读取 URL 中的 `data` 参数
 5. base64 解码并解析 JSON
-6. 取出 `sp`
-7. 记录当天第一次读取到的 SP 作为今日起点
+6. 取出 `sp`（Skill Points）
+7. 记录当天第一次读取到的 Skill Points 作为今日起点
 8. 计算今日SP = 今日起点SP - 当前剩余SP（最小显示为 0）
 9. 按当前勾选的语言顺序发送两行聊天框消息
 
@@ -123,7 +123,7 @@ Today SP: 560K
 settings.json
 ```
 
-以及今日 SP 记录文件：
+以及今日 Skill Points（SP）记录文件：
 
 ```text
 daily_sp.json
@@ -207,8 +207,14 @@ dist/dekapu-osc-clicker.exe
 - 确认选择的是 VRChat 的日志目录，而不是上一级目录
 
 ### 4. 今日SP为什么是 0
-- 当天第一次读取到 SP 时，会把这条记录作为今日起点
+- 当天第一次读取到 Skill Points（SP）时，会把这条记录作为今日起点
 - 所以第一条消息里的今日SP正常就是 0
+
+## 术语说明
+
+- `sp` = `Skill Points`
+- 文档中的“剩余SP”表示剩余 Skill Points
+- 文档中的“今日SP”表示今日已使用的 Skill Points（按当天第一次读取到的值开始计算）
 
 ## License
 
