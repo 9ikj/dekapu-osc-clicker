@@ -2,6 +2,7 @@ from pathlib import Path
 from threading import Event, Thread
 
 from .constants import LOG_FILE_PATTERN, MONITOR_POLL_INTERVAL
+from .daily_sp import DailySPTracker
 from .dsm_parser import extract_generated_url_from_line, extract_last_generated_url, extract_sp_from_generated_url
 
 
@@ -16,6 +17,7 @@ class LogMonitor:
         self.waiting_for_generated_url = False
         self.selected_languages = ["zh", "en", "ja"]
         self.language_index = 0
+        self.daily_sp_tracker = DailySPTracker()
 
     def _set_status(self, text):
         self.status_callback(text)
@@ -66,15 +68,17 @@ class LogMonitor:
         if not self.selected_languages:
             raise ValueError("请至少选择一种发送语言")
 
+        _daily_data, today_used = self.daily_sp_tracker.update(sp_value)
         language = self.selected_languages[self.language_index]
-        formatted_value = self._format_number(sp_value, language)
+        formatted_remaining = self._format_number(sp_value, language)
+        formatted_today = self._format_number(today_used, language)
 
         if language == "en":
-            message = f"Remaining SP: {formatted_value}"
+            message = f"Remaining SP: {formatted_remaining}\nToday SP: {formatted_today}"
         elif language == "ja":
-            message = f"残りSP: {formatted_value}"
+            message = f"残りSP: {formatted_remaining}\n今日SP: {formatted_today}"
         else:
-            message = f"剩余SP:{formatted_value}"
+            message = f"剩余SP:{formatted_remaining}\n今日SP:{formatted_today}"
 
         if advance:
             self.language_index = (self.language_index + 1) % len(self.selected_languages)

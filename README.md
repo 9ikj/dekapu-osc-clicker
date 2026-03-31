@@ -15,9 +15,9 @@
 - 自动监听最新 `output_log_*.txt`
 - 发现新的 `[DSM SaveURL] Generated URL:` 后自动提取 `sp`
 - 自动发送聊天框消息，支持中文 / 英语 / 日语轮换
+- 聊天框消息按换行显示“剩余SP”和“今日SP”
+- 今日SP按“当天软件第一次读取到的 SP”开始累计，重开软件后仍可继续计算
 - 可勾选要参与发送的语言：中文 / 英语 / 日语（至少保留一种）
-- 支持“测试发送”按钮，快速验证 OSC 聊天框发送是否正常
-- 支持“读取当前SP”按钮，快速预览当前日志中的 SP 结果
 - 英语使用 `K / M / B / T` 单位
 - 中文使用 `万 / 亿 / 万亿` 单位
 - 日语使用 `万 / 億 / 兆` 单位
@@ -56,10 +56,8 @@ python -m dekapu_osc_clicker
 3. 点击“浏览”选择 VRChat 日志目录
 4. 点击“开始”或按 `F1` 开始点击
 5. 点击“停止”或按 `F2` 停止点击
-6. 如需验证 OSC 是否正常，可点击“测试发送”
-7. 如需查看当前日志里的最新 SP，可点击“读取当前SP”
-8. 勾选“自动监听最新日志并发送SP”启用自动监听
-9. 在界面中勾选要参与发送的语言：中文 / 英语 / 日语
+6. 勾选“自动监听最新日志并发送SP”启用自动监听
+7. 在界面中勾选要参与发送的语言：中文 / 英语 / 日语
 
 点击频率当前限制范围：
 
@@ -90,7 +88,30 @@ C:\Users\你的用户名\AppData\LocalLow\VRChat\VRChat
 4. 读取 URL 中的 `data` 参数
 5. base64 解码并解析 JSON
 6. 取出 `sp`
-7. 按当前勾选的语言顺序发送聊天框消息，例如：中文 -> 英语 -> 日语
+7. 记录当天第一次读取到的 SP 作为今日起点
+8. 计算今日SP = 今日起点SP - 当前剩余SP（最小显示为 0）
+9. 按当前勾选的语言顺序发送两行聊天框消息
+
+中文示例：
+
+```text
+剩余SP:1234万
+今日SP:56万
+```
+
+英文示例：
+
+```text
+Remaining SP: 12M
+Today SP: 560K
+```
+
+日文示例：
+
+```text
+残りSP:1234万
+今日SP:56万
+```
 
 监听从当前文件末尾开始，不会重复发送旧日志。
 
@@ -102,16 +123,24 @@ C:\Users\你的用户名\AppData\LocalLow\VRChat\VRChat
 settings.json
 ```
 
+以及今日 SP 记录文件：
+
+```text
+daily_sp.json
+```
+
 当前用于保存：
 
 - `log_dir`
 - `click_delay_ms`
 - `languages`
+- 当天 `first_sp` / `last_sp`
 
 程序会对配置做基础容错：
 
 - 非法点击频率会自动回退/夹紧到允许范围
 - 非法语言列表会自动恢复为默认值
+- `daily_sp.json` 异常时会自动回退并重新生成
 
 ## 项目结构
 
@@ -120,6 +149,7 @@ settings.json
 ├─ README.md
 ├─ requirements.txt
 ├─ settings.json
+├─ daily_sp.json
 ├─ dekapu_osc_clicker.py
 └─ dekapu_osc_clicker/
    ├─ __init__.py
@@ -127,6 +157,7 @@ settings.json
    ├─ app.py
    ├─ clicker.py
    ├─ constants.py
+   ├─ daily_sp.py
    ├─ dsm_parser.py
    ├─ log_monitor.py
    ├─ osc_client.py
@@ -174,6 +205,10 @@ dist/dekapu-osc-clicker.exe
 
 ### 3. 找不到日志文件
 - 确认选择的是 VRChat 的日志目录，而不是上一级目录
+
+### 4. 今日SP为什么是 0
+- 当天第一次读取到 SP 时，会把这条记录作为今日起点
+- 所以第一条消息里的今日SP正常就是 0
 
 ## License
 
