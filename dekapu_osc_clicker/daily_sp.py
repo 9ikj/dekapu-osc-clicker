@@ -1,10 +1,9 @@
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 
 
-SHANGHAI_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
 DEFAULT_DAILY_SP = {
     "date": "",
     "first_sp": 0,
@@ -28,7 +27,7 @@ class DailySPTracker:
 
     @staticmethod
     def today_string():
-        return datetime.now(SHANGHAI_TZ).strftime("%Y-%m-%d")
+        return datetime.now().strftime("%Y-%m-%d")
 
     def load(self):
         if not self.file_path.exists():
