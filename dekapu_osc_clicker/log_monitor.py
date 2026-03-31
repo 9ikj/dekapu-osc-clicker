@@ -64,25 +64,37 @@ class LogMonitor:
 
         return "".join(parts)
 
-    def _build_sp_message(self, sp_value, advance=False):
-        if not self.selected_languages:
-            raise ValueError("请至少选择一种发送语言")
-
-        _daily_data, today_used = self.daily_sp_tracker.update(sp_value)
-        language = self.selected_languages[self.language_index]
+    def _build_sp_message(self, sp_value, today_used, language):
         formatted_remaining = self._format_number(sp_value, language)
         formatted_today = self._format_number(today_used, language)
 
         if language == "en":
-            message = f"Remaining SP: {formatted_remaining}\nToday SP: {formatted_today}"
-        elif language == "ja":
-            message = f"残りSP: {formatted_remaining}\n今日SP: {formatted_today}"
-        else:
-            message = f"剩余SP:{formatted_remaining}\n今日SP:{formatted_today}"
+            return f"Remaining SP: {formatted_remaining}\nToday SP: {formatted_today}"
+        if language == "ja":
+            return f"残りSP: {formatted_remaining}\n今日SP: {formatted_today}"
+        return f"剩余SP:{formatted_remaining}\n今日SP:{formatted_today}"
 
-        if advance:
+    def _get_current_language(self):
+        if not self.selected_languages:
+            raise ValueError("请至少选择一种发送语言")
+        return self.selected_languages[self.language_index]
+
+    def _advance_language(self):
+        if self.selected_languages:
             self.language_index = (self.language_index + 1) % len(self.selected_languages)
 
+    def _prepare_message(self, sp_value):
+        _daily_data, today_used = self.daily_sp_tracker.update(sp_value)
+        language = self._get_current_language()
+        message = self._build_sp_message(sp_value, today_used, language)
+        return message, today_used, language
+
+    def _send_sp_message(self, sp_value):
+        message, _today_used, _language = self._prepare_message(sp_value)
+        self._debug_log(f"parsed sp={sp_value}, sending chatbox message: {message}")
+        self.send_chatbox_message(message)
+        self._advance_language()
+        self._set_status(f"状态：监听中，已发送 SP={sp_value}")
         return message
 
     @staticmethod
@@ -105,7 +117,8 @@ class LogMonitor:
         latest_log = self.get_latest_vrchat_log_file(log_dir)
         generated_url = extract_last_generated_url(latest_log)
         sp_value = extract_sp_from_generated_url(generated_url)
-        return self._build_sp_message(sp_value, advance=False), sp_value
+        message, _today_used, _language = self._prepare_message(sp_value)
+        return message, sp_value
 
     def initialize(self, log_dir):
         latest_log = self.get_latest_vrchat_log_file(log_dir)
@@ -141,11 +154,7 @@ class LogMonitor:
                 self.waiting_for_generated_url = False
                 try:
                     sp_value = extract_sp_from_generated_url(stripped_line)
-                    message = self._build_sp_message(sp_value, advance=False)
-                    self._debug_log(f"parsed sp={sp_value}, sending chatbox message: {message}")
-                    self.send_chatbox_message(message)
-                    self._build_sp_message(sp_value, advance=True)
-                    self._set_status(f"状态：监听中，已发送 sp={sp_value}")
+                    self._send_sp_message(sp_value)
                 except ValueError as exc:
                     self._debug_log(f"failed to parse/send DSM continuation line: {exc}")
                     self._set_status(f"状态：监听中，跳过异常日志：{exc}")
@@ -156,11 +165,7 @@ class LogMonitor:
                 self._debug_log(f"matched inline DSM line: {line}")
                 try:
                     sp_value = extract_sp_from_generated_url(generated_url)
-                    message = self._build_sp_message(sp_value, advance=False)
-                    self._debug_log(f"parsed sp={sp_value}, sending chatbox message: {message}")
-                    self.send_chatbox_message(message)
-                    self._build_sp_message(sp_value, advance=True)
-                    self._set_status(f"状态：监听中，已发送 sp={sp_value}")
+                    self._send_sp_message(sp_value)
                 except ValueError as exc:
                     self._debug_log(f"failed to parse/send inline DSM line: {exc}")
                     self._set_status(f"状态：监听中，跳过异常日志：{exc}")
@@ -208,6 +213,9 @@ class LogMonitor:
 
     def stop(self):
         self.monitor_stop_event.set()
+        worker = self.monitor_worker
+        if worker is not None and worker.is_alive():
+            worker.join(timeout=1)
         self._debug_log("monitor stopped")
         self.monitor_worker = None
         self.monitor_current_file = None

@@ -8,6 +8,7 @@ DEFAULT_DAILY_SP = {
     "date": "",
     "first_sp": 0,
     "last_sp": 0,
+    "updated_at": "",
 }
 
 
@@ -53,6 +54,7 @@ class DailySPTracker:
         merged["date"] = str(merged.get("date", "") or "")
         merged["first_sp"] = self._to_int(merged.get("first_sp"))
         merged["last_sp"] = self._to_int(merged.get("last_sp"))
+        merged["updated_at"] = str(merged.get("updated_at", "") or "")
 
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self.file_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -66,7 +68,9 @@ class DailySPTracker:
 
     def update(self, sp_value):
         current_sp = self._to_int(sp_value)
-        today = self.today_string()
+        now = datetime.now()
+        today = now.strftime("%Y-%m-%d")
+        updated_at = now.strftime("%Y-%m-%d %H:%M:%S")
         data = self.load()
 
         if data.get("date") != today:
@@ -74,6 +78,7 @@ class DailySPTracker:
                 "date": today,
                 "first_sp": current_sp,
                 "last_sp": current_sp,
+                "updated_at": updated_at,
             }
         else:
             first_sp = self._to_int(data.get("first_sp"))
@@ -83,6 +88,7 @@ class DailySPTracker:
                 "date": today,
                 "first_sp": first_sp,
                 "last_sp": current_sp,
+                "updated_at": updated_at,
             }
 
         self.save(data)

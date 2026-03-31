@@ -12,3 +12,4 @@ env/
 build/
 dist/
 settings.json
+daily_sp.json
