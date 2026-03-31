@@ -58,7 +58,8 @@ jobs:
             $header = "## Changes"
           }
 
-          $changes = git log $compareRange --pretty=format:"- %h %s"
+          $changes = git log $compareRange --pretty=format:"- %h %s%n"
+          $changes = ($changes | Out-String).Trim()
           if (-not $changes) {
             $changes = "- No changes found"
           }
