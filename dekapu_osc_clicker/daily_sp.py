@@ -1,11 +1,10 @@
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 
-SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+SHANGHAI_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
 DEFAULT_DAILY_SP = {
     "date": "",
     "first_sp": 0,
