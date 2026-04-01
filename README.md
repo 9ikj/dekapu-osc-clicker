@@ -203,7 +203,9 @@ dist/dekapu-osc-clicker.exe
 
 说明：
 - 若 `dekapu_osc_clicker/assets/sp_assistant_icon.ico` 存在，打包后的 exe 会自动使用该图标
-- 打包时会一并带上 `dekapu_osc_clicker/assets` 资源目录，供窗口图标/托盘图标使用
+- 程序运行时的窗口图标优先使用内嵌 base64 PNG，不依赖外部资源路径；若需要则再回退到 `assets` 中的图标文件
+- 系统托盘图标优先使用内嵌图标，若加载失败则回退到 `assets` 中的 `.png`
+- 打包时会一并带上 `dekapu_osc_clicker/assets` 资源目录，供 exe 图标生成与额外回退资源使用
 
 当通过 GitHub Actions 的手动 Release 工作流打包时：
 

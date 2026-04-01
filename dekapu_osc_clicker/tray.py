@@ -1,6 +1,8 @@
+import io
 import threading
 
 from .constants import get_assets_dir
+from .icon_data import get_tray_icon_image, get_window_icon_png_bytes
 
 try:
     import pystray
@@ -38,12 +40,22 @@ class TrayController:
         png_path = get_assets_dir() / "sp_assistant_icon.png"
         if Image is None:
             return None
+
+        try:
+            return Image.open(io.BytesIO(get_window_icon_png_bytes()))
+        except Exception:
+            pass
+
         if png_path.exists():
             try:
                 return Image.open(png_path)
             except Exception:
                 pass
-        return self._create_fallback_icon()
+
+        try:
+            return get_tray_icon_image(64)
+        except Exception:
+            return self._create_fallback_icon()
 
     def _show_window(self, icon=None, item=None):
         self.ui.show_from_tray()

@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 from .constants import APP_TITLE, DEFAULT_CLICK_DELAY_MS, WINDOW_SIZE, get_assets_dir
+from .icon_data import WINDOW_ICON_PNG_BASE64
 
 
 class MainWindow:
@@ -31,10 +32,27 @@ class MainWindow:
         self.root.bind("<Unmap>", self._on_root_unmap)
 
     def _apply_window_icon(self):
-        png_path = get_assets_dir() / "sp_assistant_icon.png"
+        assets_dir = get_assets_dir()
+        ico_path = assets_dir / "sp_assistant_icon.ico"
+        png_path = assets_dir / "sp_assistant_icon.png"
+
+        if ico_path.exists():
+            try:
+                self.root.iconbitmap(default=str(ico_path))
+            except Exception:
+                pass
+
+        try:
+            self._window_icon = tk.PhotoImage(data=WINDOW_ICON_PNG_BASE64)
+            self.root.iconphoto(True, self._window_icon)
+            return
+        except Exception:
+            pass
+
         if png_path.exists():
             try:
-                self.root.iconphoto(True, tk.PhotoImage(file=str(png_path)))
+                self._window_icon = tk.PhotoImage(file=str(png_path))
+                self.root.iconphoto(True, self._window_icon)
             except Exception:
                 pass
 
