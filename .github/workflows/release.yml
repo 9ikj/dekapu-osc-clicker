@@ -33,6 +33,28 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Generate app icons
+        shell: pwsh
+        run: python tools/generate_icon.py
+
+      - name: Compile source
+        shell: pwsh
+        run: python -m compileall dekapu_osc_clicker dekapu_osc_clicker.py tools/generate_icon.py
+
+      - name: Verify generated assets
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            "dekapu_osc_clicker/assets/sp_assistant_icon.png",
+            "dekapu_osc_clicker/assets/sp_assistant_icon.ico"
+          )
+
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) {
+              throw "Missing required asset: $file"
+            }
+          }
+
       - name: Build executable
         shell: pwsh
         run: ./build.ps1 -Version "${{ github.event.inputs.tag }}"

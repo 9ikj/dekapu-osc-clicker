@@ -22,6 +22,8 @@
 - 中文使用 `万 / 亿 / 万亿` 单位
 - 日语使用 `万 / 億 / 兆` 单位
 - GitHub Actions Release 打包时可将版本号注入窗口标题
+- 支持最小化到系统托盘，并可从托盘恢复窗口
+- 应用图标与桌面图标统一使用“SP 小助手”图标资源
 
 ## 环境要求
 
@@ -58,6 +60,7 @@ python -m dekapu_osc_clicker
 5. 点击“停止”或按 `F2` 停止点击
 6. 勾选“自动监听最新日志并发送 Skill Points（SP）”启用自动监听
 7. 在界面中勾选要参与发送的语言：中文 / 英语 / 日语
+8. 点击窗口关闭按钮或最小化时，程序会进入系统托盘；可从托盘菜单重新打开或退出
 
 点击频率当前限制范围：
 
@@ -157,10 +160,16 @@ daily_sp.json
 ├─ settings.json
 ├─ daily_sp.json
 ├─ dekapu_osc_clicker.py
+├─ build.ps1
+├─ tools/
+│  └─ generate_icon.py
 └─ dekapu_osc_clicker/
    ├─ __init__.py
    ├─ __main__.py
    ├─ app.py
+   ├─ assets/
+   │  ├─ README.txt
+   │  └─ sp_assistant_icon.svg
    ├─ clicker.py
    ├─ constants.py
    ├─ daily_sp.py
@@ -168,6 +177,7 @@ daily_sp.json
    ├─ log_monitor.py
    ├─ osc_client.py
    ├─ settings.py
+   ├─ tray.py
    └─ ui.py
 ```
 
@@ -191,9 +201,15 @@ daily_sp.json
 dist/dekapu-osc-clicker.exe
 ```
 
+说明：
+- 若 `dekapu_osc_clicker/assets/sp_assistant_icon.ico` 存在，打包后的 exe 会自动使用该图标
+- 打包时会一并带上 `dekapu_osc_clicker/assets` 资源目录，供窗口图标/托盘图标使用
+
 当通过 GitHub Actions 的手动 Release 工作流打包时：
 
 - 工作流会使用输入的 `tag` 作为 Release 版本号
+- 工作流会先自动生成 `sp_assistant_icon.png` / `sp_assistant_icon.ico`
+- 工作流会先执行编译检查，再校验图标资源是否生成成功
 - 生成的 Release 附件文件名为 `dekapu-osc-clicker-<tag>-windows.exe`
 - 程序窗口标题会自动包含该版本号
 - Release 内容会自动附带与上一个版本之间的 diff 日志

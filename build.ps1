@@ -32,8 +32,25 @@ os.environ["DEKAPU_OSC_CLICKER_VERSION"] = r"$Version"
     $runtimeHookArgs = @("--runtime-hook", $runtimeHookPath)
 }
 
+$iconPath = Join-Path $PSScriptRoot "dekapu_osc_clicker\assets\sp_assistant_icon.ico"
+$pyinstallerArgs = @(
+    "--noconfirm",
+    "--clean",
+    "--onefile",
+    "--windowed",
+    "--name", "dekapu-osc-clicker",
+    "--add-data", "dekapu_osc_clicker/assets;dekapu_osc_clicker/assets"
+)
+
+if (Test-Path $iconPath) {
+    $pyinstallerArgs += @("--icon", $iconPath)
+}
+
+$pyinstallerArgs += $runtimeHookArgs
+$pyinstallerArgs += "dekapu_osc_clicker.py"
+
 try {
-    pyinstaller --noconfirm --clean --onefile --windowed @runtimeHookArgs --name dekapu-osc-clicker dekapu_osc_clicker.py
+    pyinstaller @pyinstallerArgs
 }
 finally {
     if ($runtimeHookPath -and (Test-Path $runtimeHookPath)) {

@@ -4,6 +4,7 @@ from .clicker import ClickerController
 from .log_monitor import LogMonitor
 from .osc_client import VRChatOSCClient
 from .settings import MAX_CLICK_DELAY_MS, MIN_CLICK_DELAY_MS, SettingsStore
+from .tray import TrayController
 from .ui import MainWindow
 
 
@@ -17,9 +18,11 @@ class DekapuOscClickerApp:
 
         self.clicker = ClickerController(self.osc_client)
         self.log_monitor = LogMonitor(self._send_chatbox_message)
+        self.tray = None
 
     def attach_ui(self, ui):
         self.ui = ui
+        self.tray = TrayController(ui)
         self.clicker.status_callback = self.ui.set_status
         self.log_monitor.status_callback = self.ui.schedule_status
 
@@ -71,6 +74,14 @@ class DekapuOscClickerApp:
     def stop_monitoring(self):
         self.log_monitor.stop()
 
+    def ensure_tray_started(self):
+        if self.tray is None:
+            return False
+        started = self.tray.ensure_started()
+        if not started and self.ui is not None:
+            self.ui.set_status("状态：当前环境不支持系统托盘，关闭窗口将直接退出")
+        return started
+
     def register_hotkeys(self):
         self.hotkey_f1 = add_hotkey("F1", lambda: self.start_clicking(self.ui.delay_var.get()))
         self.hotkey_f2 = add_hotkey("F2", self.stop_clicking)
@@ -94,7 +105,10 @@ class DekapuOscClickerApp:
         self.stop_clicking()
         self.stop_monitoring()
         self.remove_hotkeys()
+        if self.tray is not None:
+            self.tray.stop()
         if self.ui is not None:
+            self.ui.root.quit()
             self.ui.root.destroy()
 
 

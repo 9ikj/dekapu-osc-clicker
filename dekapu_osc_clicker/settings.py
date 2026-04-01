@@ -6,10 +6,11 @@ from pathlib import Path
 MIN_CLICK_DELAY_MS = 10
 MAX_CLICK_DELAY_MS = 60000
 VALID_LANGUAGES = ("zh", "en", "ja")
+DEFAULT_LANGUAGE_ORDER = ["zh", "en", "ja"]
 DEFAULT_SETTINGS = {
     "log_dir": "",
     "click_delay_ms": 200,
-    "languages": ["zh", "en", "ja"],
+    "languages": DEFAULT_LANGUAGE_ORDER[:],
 }
 
 
@@ -70,9 +71,14 @@ class SettingsStore:
     @staticmethod
     def _sanitize_languages(languages):
         if not isinstance(languages, list):
-            return DEFAULT_SETTINGS["languages"][:]
-        valid = [lang for lang in languages if lang in VALID_LANGUAGES]
-        return valid or DEFAULT_SETTINGS["languages"][:]
+            return DEFAULT_LANGUAGE_ORDER[:]
+
+        valid = []
+        for lang in languages:
+            if lang in VALID_LANGUAGES and lang not in valid:
+                valid.append(lang)
+
+        return valid or DEFAULT_LANGUAGE_ORDER[:]
 
     def get_log_dir(self):
         saved_log_dir = self.load().get("log_dir", "")

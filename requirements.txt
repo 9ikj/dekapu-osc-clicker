@@ -1,2 +1,4 @@
 python-osc
 keyboard
+pystray
+pillow

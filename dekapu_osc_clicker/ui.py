@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from .constants import APP_TITLE, DEFAULT_CLICK_DELAY_MS, WINDOW_SIZE
+from .constants import APP_TITLE, DEFAULT_CLICK_DELAY_MS, WINDOW_SIZE, get_assets_dir
 
 
 class MainWindow:
@@ -11,6 +11,9 @@ class MainWindow:
         self.root.title(APP_TITLE)
         self.root.geometry(WINDOW_SIZE)
         self.root.resizable(False, False)
+        self._is_hidden_to_tray = False
+
+        self._apply_window_icon()
 
         self.delay_var = tk.StringVar(value=str(self.app.get_saved_click_delay_ms() or DEFAULT_CLICK_DELAY_MS))
         self.log_dir_var = tk.StringVar(value=self.app.get_saved_log_dir())
@@ -24,7 +27,16 @@ class MainWindow:
 
         self._build_ui()
         self.delay_var.trace_add("write", self._apply_click_delay)
-        self.root.protocol("WM_DELETE_WINDOW", self.app.close_app)
+        self.root.protocol("WM_DELETE_WINDOW", self._handle_window_close)
+        self.root.bind("<Unmap>", self._on_root_unmap)
+
+    def _apply_window_icon(self):
+        png_path = get_assets_dir() / "sp_assistant_icon.png"
+        if png_path.exists():
+            try:
+                self.root.iconphoto(True, tk.PhotoImage(file=str(png_path)))
+            except Exception:
+                pass
 
     def _build_ui(self):
         frame = tk.Frame(self.root, padx=16, pady=16)
@@ -63,6 +75,36 @@ class MainWindow:
 
     def set_status(self, text):
         self.status_var.set(text)
+
+    def _handle_window_close(self):
+        if self.app.ensure_tray_started():
+            self.hide_to_tray()
+            return
+        self.app.close_app()
+
+    def _on_root_unmap(self, _event):
+        if self.root.state() == "iconic" and self.app.ensure_tray_started():
+            self.hide_to_tray()
+
+    def hide_to_tray(self):
+        if self._is_hidden_to_tray:
+            return
+        self._is_hidden_to_tray = True
+        self.root.withdraw()
+        self.set_status("状态：程序已最小化到托盘")
+
+    def show_from_tray(self):
+        self._is_hidden_to_tray = False
+        self.root.deiconify()
+        try:
+            self.root.state("normal")
+        except Exception:
+            pass
+        self.root.lift()
+        self.root.focus_force()
+
+    def exit_from_tray(self):
+        self.app.close_app()
 
     def schedule_status(self, text):
         self.root.after(0, lambda: self.set_status(text))
