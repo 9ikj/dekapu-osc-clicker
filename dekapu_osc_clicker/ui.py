@@ -118,8 +118,22 @@ class MainWindow:
             self.root.state("normal")
         except Exception:
             pass
+        self.root.after(0, self._focus_window)
+
+    def schedule_show_from_external_request(self):
+        self.root.after(0, self.show_from_tray)
+
+    def _focus_window(self):
         self.root.lift()
-        self.root.focus_force()
+        try:
+            self.root.attributes("-topmost", True)
+            self.root.after(150, lambda: self.root.attributes("-topmost", False))
+        except Exception:
+            pass
+        try:
+            self.root.focus_force()
+        except Exception:
+            pass
 
     def exit_from_tray(self):
         self.app.close_app()

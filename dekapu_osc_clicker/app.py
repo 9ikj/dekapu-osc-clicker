@@ -4,6 +4,7 @@ from .clicker import ClickerController
 from .log_monitor import LogMonitor
 from .osc_client import VRChatOSCClient
 from .settings import MAX_CLICK_DELAY_MS, MIN_CLICK_DELAY_MS, SettingsStore
+from .single_instance import SingleInstanceManager
 from .tray import TrayController
 from .ui import MainWindow
 
@@ -19,6 +20,7 @@ class DekapuOscClickerApp:
         self.clicker = ClickerController(self.osc_client)
         self.log_monitor = LogMonitor(self._send_chatbox_message)
         self.tray = None
+        self.single_instance = SingleInstanceManager(self._wake_existing_window)
 
     def attach_ui(self, ui):
         self.ui = ui
@@ -101,10 +103,22 @@ class DekapuOscClickerApp:
                 pass
             self.hotkey_f2 = None
 
+    def _wake_existing_window(self):
+        if self.ui is None:
+            return
+        self.ui.schedule_show_from_external_request()
+
+    def start_single_instance_guard(self):
+        return self.single_instance.start()
+
+    def notify_existing_instance(self):
+        return self.single_instance.notify_existing_instance()
+
     def close_app(self):
         self.stop_clicking()
         self.stop_monitoring()
         self.remove_hotkeys()
+        self.single_instance.stop()
         if self.tray is not None:
             self.tray.stop()
         if self.ui is not None:
@@ -114,6 +128,10 @@ class DekapuOscClickerApp:
 
 def main():
     app = DekapuOscClickerApp()
+    if not app.start_single_instance_guard():
+        app.notify_existing_instance()
+        return
+
     ui = MainWindow(app)
     app.attach_ui(ui)
     app.register_hotkeys()
