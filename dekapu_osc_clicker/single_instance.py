@@ -1,69 +1,130 @@
-import socket
-import threading
-from contextlib import closing
+try:
+    import ctypes
+    from ctypes import wintypes
+except Exception:  # pragma: no cover
+    ctypes = None
+    wintypes = None
 
-HOST = "127.0.0.1"
-PORT = 47653
-WAKE_MESSAGE = b"SHOW_WINDOW"
+MUTEX_NAME = "Global\\DekapuOscClickerSingleton"
+WINDOW_TITLE = "dekapu-osc-clicker"
+SW_RESTORE = 9
 
 
 class SingleInstanceManager:
-    def __init__(self, on_wake=None):
-        self.on_wake = on_wake or (lambda: None)
-        self._server = None
-        self._thread = None
-        self._running = False
+    def __init__(self, window_title=WINDOW_TITLE):
+        self.window_title = window_title
+        self._mutex_handle = None
         self.is_primary_instance = False
 
     def start(self):
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            server.bind((HOST, PORT))
-            server.listen(5)
-        except OSError:
-            server.close()
+        mutex_result = self._acquire_windows_mutex()
+        if mutex_result is False:
             self.is_primary_instance = False
             return False
-
-        self._server = server
-        self._running = True
+        self._mutex_handle = mutex_result
         self.is_primary_instance = True
-        self._thread = threading.Thread(target=self._serve, daemon=True)
-        self._thread.start()
         return True
 
-    def _serve(self):
-        while self._running and self._server is not None:
-            try:
-                conn, _addr = self._server.accept()
-            except OSError:
-                break
-            with closing(conn):
-                try:
-                    data = conn.recv(1024)
-                except OSError:
-                    continue
-                if data == WAKE_MESSAGE:
-                    try:
-                        self.on_wake()
-                    except Exception:
-                        pass
-
-    @staticmethod
-    def notify_existing_instance():
+    def _acquire_windows_mutex(self):
+        if ctypes is None:
+            return None
         try:
-            with socket.create_connection((HOST, PORT), timeout=1) as conn:
-                conn.sendall(WAKE_MESSAGE)
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.CreateMutexW(None, False, MUTEX_NAME)
+            if not handle:
+                return None
+            already_exists = kernel32.GetLastError() == 183
+            if already_exists:
+                kernel32.CloseHandle(handle)
+                return False
+            return handle
+        except Exception:
+            return None
+
+    def notify_existing_instance(self):
+        return self._bring_existing_window_to_front()
+
+    def _bring_existing_window_to_front(self):
+        if ctypes is None or wintypes is None:
+            return False
+        try:
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+            user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
+            user32.EnumWindows.restype = wintypes.BOOL
+            user32.IsWindowVisible.argtypes = [wintypes.HWND]
+            user32.IsWindowVisible.restype = wintypes.BOOL
+            user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+            user32.GetWindowTextLengthW.restype = ctypes.c_int
+            user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+            user32.GetWindowTextW.restype = ctypes.c_int
+            user32.IsIconic.argtypes = [wintypes.HWND]
+            user32.IsIconic.restype = wintypes.BOOL
+            user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+            user32.ShowWindow.restype = wintypes.BOOL
+            user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+            user32.SetForegroundWindow.restype = wintypes.BOOL
+            user32.BringWindowToTop.argtypes = [wintypes.HWND]
+            user32.BringWindowToTop.restype = wintypes.BOOL
+            user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+            user32.AttachThreadInput.restype = wintypes.BOOL
+            user32.GetForegroundWindow.restype = wintypes.HWND
+            user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+            user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+            kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+
+            matched_hwnd = None
+            title_prefix = self.window_title.lower()
+
+            def enum_proc(hwnd, _lparam):
+                nonlocal matched_hwnd
+                if not user32.IsWindowVisible(hwnd):
+                    return True
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length <= 0:
+                    return True
+                buffer = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(hwnd, buffer, length + 1)
+                title = buffer.value.strip().lower()
+                if title.startswith(title_prefix):
+                    matched_hwnd = hwnd
+                    return False
+                return True
+
+            user32.EnumWindows(WNDENUMPROC(enum_proc), 0)
+            hwnd = matched_hwnd
+            if not hwnd:
+                return False
+
+            user32.ShowWindow(hwnd, SW_RESTORE)
+
+            foreground = user32.GetForegroundWindow()
+            current_thread = kernel32.GetCurrentThreadId()
+            target_thread = user32.GetWindowThreadProcessId(hwnd, None)
+            foreground_thread = user32.GetWindowThreadProcessId(foreground, None) if foreground else 0
+
+            if foreground_thread and foreground_thread != current_thread:
+                user32.AttachThreadInput(current_thread, foreground_thread, True)
+            if target_thread and target_thread != current_thread:
+                user32.AttachThreadInput(current_thread, target_thread, True)
+
+            user32.BringWindowToTop(hwnd)
+            user32.SetForegroundWindow(hwnd)
+
+            if target_thread and target_thread != current_thread:
+                user32.AttachThreadInput(current_thread, target_thread, False)
+            if foreground_thread and foreground_thread != current_thread:
+                user32.AttachThreadInput(current_thread, foreground_thread, False)
             return True
-        except OSError:
+        except Exception:
             return False
 
     def stop(self):
-        self._running = False
-        if self._server is not None:
+        if self._mutex_handle and ctypes is not None:
             try:
-                self._server.close()
-            except OSError:
+                ctypes.windll.kernel32.CloseHandle(self._mutex_handle)
+            except Exception:
                 pass
-            self._server = None
+        self._mutex_handle = None
