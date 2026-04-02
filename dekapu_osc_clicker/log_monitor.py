@@ -3,13 +3,14 @@ from threading import Event, Thread
 
 from .constants import LOG_FILE_PATTERN, MONITOR_POLL_INTERVAL
 from .daily_sp import DailySPTracker
-from .dsm_parser import extract_generated_url_from_line, extract_last_generated_url, extract_sp_from_generated_url
+from .dsm_parser import extract_generated_url_from_line, extract_last_generated_url, extract_payload_from_generated_url
 
 
 class LogMonitor:
-    def __init__(self, send_chatbox_message, status_callback=None):
+    def __init__(self, send_chatbox_message, status_callback=None, stats_store=None):
         self.send_chatbox_message = send_chatbox_message
         self.status_callback = status_callback or (lambda _text: None)
+        self.stats_store = stats_store
         self.monitor_stop_event = Event()
         self.monitor_worker = None
         self.monitor_current_file = None
@@ -97,6 +98,22 @@ class LogMonitor:
         self._set_status(f"状态：监听中，已发送 SP={sp_value}")
         return message
 
+    def _record_payload(self, payload, log_file, source_url):
+        if self.stats_store is None:
+            return
+        try:
+            self.stats_store.record_payload(payload, source_log_file=log_file.name, source_url=source_url)
+        except Exception as exc:
+            self._debug_log(f"failed to record payload: {exc}")
+            self._set_status(f"状态：监听中，统计写入失败：{exc}")
+
+    def _handle_generated_url(self, source_url, log_file):
+        payload = extract_payload_from_generated_url(source_url)
+        self._record_payload(payload, log_file, source_url)
+        if "sp" not in payload:
+            raise ValueError("JSON 中未找到 sp 字段")
+        self._send_sp_message(str(payload["sp"]))
+
     @staticmethod
     def get_latest_vrchat_log_file(log_dir):
         log_path = Path(log_dir)
@@ -116,7 +133,10 @@ class LogMonitor:
     def get_current_sp_message(self, log_dir):
         latest_log = self.get_latest_vrchat_log_file(log_dir)
         generated_url = extract_last_generated_url(latest_log)
-        sp_value = extract_sp_from_generated_url(generated_url)
+        payload = extract_payload_from_generated_url(generated_url)
+        if "sp" not in payload:
+            raise ValueError("JSON 中未找到 sp 字段")
+        sp_value = str(payload["sp"])
         message, _today_used, _language = self._prepare_message(sp_value)
         return message, sp_value
 
@@ -153,8 +173,7 @@ class LogMonitor:
                 self._debug_log(f"using next line as DSM url: {stripped_line}")
                 self.waiting_for_generated_url = False
                 try:
-                    sp_value = extract_sp_from_generated_url(stripped_line)
-                    self._send_sp_message(sp_value)
+                    self._handle_generated_url(stripped_line, log_file)
                 except ValueError as exc:
                     self._debug_log(f"failed to parse/send DSM continuation line: {exc}")
                     self._set_status(f"状态：监听中，跳过异常日志：{exc}")
@@ -164,8 +183,7 @@ class LogMonitor:
             if generated_url:
                 self._debug_log(f"matched inline DSM line: {line}")
                 try:
-                    sp_value = extract_sp_from_generated_url(generated_url)
-                    self._send_sp_message(sp_value)
+                    self._handle_generated_url(generated_url, log_file)
                 except ValueError as exc:
                     self._debug_log(f"failed to parse/send inline DSM line: {exc}")
                     self._set_status(f"状态：监听中，跳过异常日志：{exc}")

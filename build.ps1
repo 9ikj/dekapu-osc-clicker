@@ -17,10 +17,6 @@ if (Test-Path dist) {
     Remove-Item dist -Recurse -Force
 }
 
-if (Test-Path dekapu-osc-clicker.spec) {
-    Remove-Item dekapu-osc-clicker.spec -Force
-}
-
 $runtimeHookPath = $null
 $runtimeHookArgs = @()
 if ($Version) {
@@ -32,14 +28,28 @@ os.environ["DEKAPU_OSC_CLICKER_VERSION"] = r"$Version"
     $runtimeHookArgs = @("--runtime-hook", $runtimeHookPath)
 }
 
-$iconPath = Join-Path $PSScriptRoot "dekapu_osc_clicker\assets\sp_assistant_icon.ico"
+$assetsPath = Join-Path $PSScriptRoot "dekapu_osc_clicker\assets"
+$iconPath = Join-Path $assetsPath "sp_assistant_icon.ico"
+$pngIconPath = Join-Path $assetsPath "sp_assistant_icon.png"
+
+python tools/generate_icon.py
+
+$requiredFiles = @($iconPath, $pngIconPath)
+foreach ($file in $requiredFiles) {
+    if (-not (Test-Path $file)) {
+        throw "Missing required asset: $file"
+    }
+}
+
+python -m compileall dekapu_osc_clicker dekapu_osc_clicker.py
+
 $pyinstallerArgs = @(
     "--noconfirm",
     "--clean",
     "--onefile",
     "--windowed",
     "--name", "dekapu-osc-clicker",
-    "--add-data", "dekapu_osc_clicker/assets;dekapu_osc_clicker/assets"
+    "--add-data", "${assetsPath};dekapu_osc_clicker/assets"
 )
 
 if (Test-Path $iconPath) {

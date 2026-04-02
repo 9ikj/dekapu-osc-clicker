@@ -77,6 +77,7 @@ class MainWindow:
         button_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(16, 0))
         tk.Button(button_frame, text="开始", width=12, command=self._start_clicking).pack(side="left")
         tk.Button(button_frame, text="停止", width=12, command=self._stop_clicking).pack(side="left", padx=(12, 0))
+        tk.Button(button_frame, text="统计", width=12, command=self.open_stats_page).pack(side="right")
 
         tk.Checkbutton(frame, text="自动监听最新日志并发送SP", variable=self.monitor_var, command=self._toggle_monitoring).grid(row=5, column=0, columnspan=3, sticky="w", pady=(12, 0))
 
@@ -140,6 +141,12 @@ class MainWindow:
 
     def schedule_status(self, text):
         self.root.after(0, lambda: self.set_status(text))
+
+    def open_stats_page(self):
+        try:
+            self.app.open_stats_page()
+        except Exception as exc:
+            messagebox.showerror("错误", f"打开统计页面失败：{exc}")
 
     def _apply_click_delay(self, *_args):
         try:

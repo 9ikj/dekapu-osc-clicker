@@ -63,6 +63,9 @@ class TrayController:
     def _hide_window(self, icon=None, item=None):
         self.ui.hide_to_tray()
 
+    def _open_stats(self, icon=None, item=None):
+        self.ui.open_stats_page()
+
     def _exit_app(self, icon=None, item=None):
         self.ui.exit_from_tray()
 
@@ -71,6 +74,7 @@ class TrayController:
         menu = pystray.Menu(
             pystray.MenuItem("打开", self._show_window, default=True),
             pystray.MenuItem("隐藏", self._hide_window),
+            pystray.MenuItem("统计", self._open_stats),
             pystray.MenuItem("退出", self._exit_app),
         )
         self.icon = pystray.Icon("dekapu-osc-clicker", image, "SP 小助手", menu)

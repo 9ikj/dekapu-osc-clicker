@@ -1,11 +1,13 @@
 from keyboard import add_hotkey, remove_hotkey
 
 from .clicker import ClickerController
-from .constants import BASE_APP_TITLE
+from .constants import BASE_APP_TITLE, get_stats_db_file
 from .log_monitor import LogMonitor
 from .osc_client import VRChatOSCClient
 from .settings import MAX_CLICK_DELAY_MS, MIN_CLICK_DELAY_MS, SettingsStore
 from .single_instance import SingleInstanceManager
+from .stats_store import StatsStore
+from .stats_web import StatsWebServer
 from .tray import TrayController
 from .ui import MainWindow
 
@@ -13,13 +15,15 @@ from .ui import MainWindow
 class DekapuOscClickerApp:
     def __init__(self):
         self.settings = SettingsStore()
+        self.stats_store = StatsStore(get_stats_db_file())
+        self.stats_web = StatsWebServer(self.stats_store)
         self.osc_client = VRChatOSCClient()
         self.ui = None
         self.hotkey_f1 = None
         self.hotkey_f2 = None
 
         self.clicker = ClickerController(self.osc_client)
-        self.log_monitor = LogMonitor(self._send_chatbox_message)
+        self.log_monitor = LogMonitor(self._send_chatbox_message, stats_store=self.stats_store)
         self.tray = None
         self.single_instance = SingleInstanceManager(BASE_APP_TITLE)
 
@@ -77,6 +81,12 @@ class DekapuOscClickerApp:
     def stop_monitoring(self):
         self.log_monitor.stop()
 
+    def open_stats_page(self):
+        return self.stats_web.open_page("/")
+
+    def open_stats_changes_page(self):
+        return self.stats_web.open_page("/changes")
+
     def ensure_tray_started(self):
         if self.tray is None:
             return False
@@ -115,6 +125,7 @@ class DekapuOscClickerApp:
         self.stop_monitoring()
         self.remove_hotkeys()
         self.single_instance.stop()
+        self.stats_web.stop()
         if self.tray is not None:
             self.tray.stop()
         if self.ui is not None:

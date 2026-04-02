@@ -45,14 +45,18 @@ def decode_data_to_json(data_value):
         raise ValueError("data 字段解码后不是有效 JSON") from exc
 
 
-def extract_sp_from_generated_url(url):
+def extract_payload_from_generated_url(url):
     parsed = urlparse(url)
     query = parse_qs(parsed.query)
     data_values = query.get("data")
     if not data_values or not data_values[0]:
         raise ValueError("URL 中未找到 data 参数")
 
-    payload = decode_data_to_json(data_values[0])
+    return decode_data_to_json(data_values[0])
+
+
+def extract_sp_from_generated_url(url):
+    payload = extract_payload_from_generated_url(url)
     if "sp" not in payload:
         raise ValueError("JSON 中未找到 sp 字段")
 

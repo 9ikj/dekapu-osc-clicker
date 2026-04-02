@@ -17,6 +17,18 @@ def get_base_dir():
 def get_assets_dir():
     return get_base_dir() / "assets"
 
+
+def get_data_dir():
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    if sys.argv and sys.argv[0]:
+        return Path(sys.argv[0]).resolve().parent
+    return Path.cwd()
+
+
+def get_stats_db_file():
+    return get_data_dir() / "stats.db"
+
 VRCHAT_OSC_IP = "127.0.0.1"
 VRCHAT_OSC_PORT = 9000
 DEFAULT_CLICK_DELAY_MS = 200
