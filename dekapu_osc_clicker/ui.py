@@ -30,6 +30,7 @@ class MainWindow:
         self.delay_var.trace_add("write", self._apply_click_delay)
         self.root.protocol("WM_DELETE_WINDOW", self._handle_window_close)
         self.root.bind("<Unmap>", self._on_root_unmap)
+        self.root.bind("<Map>", self._on_root_map)
 
     def _apply_window_icon(self):
         assets_dir = get_assets_dir()
@@ -105,8 +106,11 @@ class MainWindow:
         if self.root.state() == "iconic" and self.app.ensure_tray_started():
             self.hide_to_tray()
 
+    def _on_root_map(self, _event):
+        self._is_hidden_to_tray = False
+
     def hide_to_tray(self):
-        if self._is_hidden_to_tray:
+        if self._is_hidden_to_tray and not self.root.winfo_viewable():
             return
         self._is_hidden_to_tray = True
         self.root.withdraw()
