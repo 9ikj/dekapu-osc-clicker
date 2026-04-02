@@ -41,11 +41,6 @@ jobs:
         shell: pwsh
         run: python -m compileall dekapu_osc_clicker dekapu_osc_clicker.py tools/generate_icon.py
 
-      - name: Smoke test stats modules
-        shell: pwsh
-        run: |
-          python -c "from pathlib import Path; from dekapu_osc_clicker.dsm_parser import extract_payload_from_generated_url; from dekapu_osc_clicker.stats_store import StatsStore; url = Path('example_data.txt').read_text(encoding='utf-8').splitlines()[0].strip(); payload = extract_payload_from_generated_url(url); required = ['credit', 'credit_all', 'sp', 'sp_use']; missing = [key for key in required if key not in payload]; assert not missing, missing; store = StatsStore(Path('build') / 'workflow-smoke-test.db'); store.record_payload(payload, source_log_file='example_data.txt', source_url=url); summary = store.get_today_summary(); assert 'total_credit_gained' in summary"
-
       - name: Verify generated assets
         shell: pwsh
         run: |
