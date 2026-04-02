@@ -20,7 +20,7 @@ class SingleInstanceManager:
 
     def start(self):
         mutex_result = self._acquire_windows_mutex()
-        if mutex_result is False:
+        if mutex_result is False or mutex_result is None:
             self.is_primary_instance = False
             return False
         self._mutex_handle = mutex_result
