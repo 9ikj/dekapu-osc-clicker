@@ -1,7 +1,7 @@
 from pathlib import Path
 from threading import Event, Thread
 
-from .constants import LOG_FILE_PATTERN, MONITOR_POLL_INTERVAL
+from .constants import LOG_FILE_PATTERN, LOG_URL_MARKER, MONITOR_POLL_INTERVAL
 from .dsm_parser import extract_generated_url_from_line, extract_last_generated_url, extract_payload_from_generated_url
 
 
@@ -101,18 +101,30 @@ class LogMonitor:
         self._set_status(f"状态：监听中，已发送 SP={sp_value}")
         return message
 
-    def _record_payload(self, payload, log_file, source_url):
+    @staticmethod
+    def _build_event_key(log_file, line_start_offset):
+        if line_start_offset is None:
+            return None
+        return f"{log_file.name}:{int(line_start_offset)}"
+
+    def _record_payload(self, payload, log_file, source_url, line_start_offset=None):
         if self.stats_store is None:
             return
         try:
-            self.stats_store.record_payload(payload, source_log_file=log_file.name, source_url=source_url)
+            event_key = self._build_event_key(log_file, line_start_offset)
+            self.stats_store.record_payload(
+                payload,
+                source_log_file=log_file.name,
+                source_url=source_url,
+                event_key=event_key,
+            )
         except Exception as exc:
             self._debug_log(f"failed to record payload: {exc}")
             self._set_status(f"状态：监听中，统计写入失败：{exc}")
 
-    def _handle_generated_url(self, source_url, log_file):
+    def _handle_generated_url(self, source_url, log_file, line_start_offset=None):
         payload = extract_payload_from_generated_url(source_url)
-        self._record_payload(payload, log_file, source_url)
+        self._record_payload(payload, log_file, source_url, line_start_offset=line_start_offset)
         if "sp" not in payload:
             raise ValueError("JSON 中未找到 sp 字段")
         self._send_sp_message(str(payload["sp"]))
@@ -155,8 +167,9 @@ class LogMonitor:
 
     def process_new_log_lines(self, log_file):
         try:
+            start_offset = self.monitor_current_offset
             with log_file.open("r", encoding="utf-8", errors="replace") as handle:
-                handle.seek(self.monitor_current_offset)
+                handle.seek(start_offset)
                 new_content = handle.read()
                 self.monitor_current_offset = handle.tell()
         except OSError as exc:
@@ -167,7 +180,10 @@ class LogMonitor:
 
         self._debug_log(f"read {len(new_content)} chars from {log_file.name}, new_offset={self.monitor_current_offset}")
 
-        for line in new_content.splitlines():
+        current_offset = start_offset
+        for line in new_content.splitlines(keepends=True):
+            line_start_offset = current_offset
+            current_offset += len(line)
             stripped_line = line.strip()
 
             if self.waiting_for_generated_url:
@@ -176,7 +192,7 @@ class LogMonitor:
                 self._debug_log(f"using next line as DSM url: {stripped_line}")
                 self.waiting_for_generated_url = False
                 try:
-                    self._handle_generated_url(stripped_line, log_file)
+                    self._handle_generated_url(stripped_line, log_file, line_start_offset=line_start_offset)
                 except ValueError as exc:
                     self._debug_log(f"failed to parse/send DSM continuation line: {exc}")
                     self._set_status(f"状态：监听中，跳过异常日志：{exc}")
@@ -186,13 +202,13 @@ class LogMonitor:
             if generated_url:
                 self._debug_log(f"matched inline DSM line: {line}")
                 try:
-                    self._handle_generated_url(generated_url, log_file)
+                    self._handle_generated_url(generated_url, log_file, line_start_offset=line_start_offset)
                 except ValueError as exc:
                     self._debug_log(f"failed to parse/send inline DSM line: {exc}")
                     self._set_status(f"状态：监听中，跳过异常日志：{exc}")
                 continue
 
-            if "[DSM SaveURL] Generated URL:" in line:
+            if LOG_URL_MARKER in line:
                 self.waiting_for_generated_url = True
                 self._debug_log("matched DSM marker line, waiting for URL on next line")
 

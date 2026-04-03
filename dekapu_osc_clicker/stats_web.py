@@ -199,7 +199,7 @@ def _build_index_html():
 
     <section class=\"grid\">
       <div class=\"card\">
-        <div class=\"metric-label\">今日获取的总 credit</div>
+        <div class=\"metric-label\">今日净增 credit</div>
         <div id=\"totalCredit\" class=\"metric-value\">加载中...</div>
         <div id=\"summaryMeta\" class=\"metric-sub\"></div>
         <div id=\"lastUpdated\" class=\"metric-sub\"><span class=\"status-dot\"></span>最后更新时间：--</div>

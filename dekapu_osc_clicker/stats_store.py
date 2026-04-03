@@ -30,35 +30,110 @@ class StatsStore:
         connection.row_factory = sqlite3.Row
         return connection
 
+    @staticmethod
+    def _index_columns(connection, index_name):
+        rows = connection.execute(f"PRAGMA index_info({json.dumps(index_name)})").fetchall()
+        return [row[2] for row in rows]
+
+    def _needs_migration(self, connection):
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(payload_snapshots)").fetchall()
+        }
+        if not columns:
+            return False
+        if "event_key" not in columns:
+            return True
+
+        indexes = connection.execute("PRAGMA index_list(payload_snapshots)").fetchall()
+        for index in indexes:
+            if not index["unique"]:
+                continue
+            if self._index_columns(connection, index["name"]) == ["payload_hash"]:
+                return True
+        return False
+
+    def _migrate_schema(self, connection):
+        connection.execute("ALTER TABLE payload_snapshots RENAME TO payload_snapshots_old")
+        self._create_table(connection)
+        connection.execute(
+            """
+            INSERT INTO payload_snapshots (
+                id,
+                captured_at,
+                captured_hour,
+                source_log_file,
+                source_url,
+                event_key,
+                payload_hash,
+                payload_json,
+                credit,
+                credit_all,
+                sp,
+                sp_use,
+                playtime,
+                firstboot,
+                lastsave,
+                version
+            )
+            SELECT
+                id,
+                captured_at,
+                captured_hour,
+                source_log_file,
+                source_url,
+                NULL,
+                payload_hash,
+                payload_json,
+                credit,
+                credit_all,
+                sp,
+                sp_use,
+                playtime,
+                firstboot,
+                lastsave,
+                version
+            FROM payload_snapshots_old
+            ORDER BY id ASC
+            """
+        )
+        connection.execute("DROP TABLE payload_snapshots_old")
+
+    def _create_table(self, connection):
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS payload_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                captured_at TEXT NOT NULL,
+                captured_hour TEXT NOT NULL,
+                source_log_file TEXT,
+                source_url TEXT,
+                event_key TEXT UNIQUE,
+                payload_hash TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                credit INTEGER,
+                credit_all INTEGER,
+                sp INTEGER,
+                sp_use INTEGER,
+                playtime INTEGER,
+                firstboot TEXT,
+                lastsave TEXT,
+                version INTEGER
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_payload_snapshots_captured_at ON payload_snapshots(captured_at)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_payload_snapshots_captured_hour ON payload_snapshots(captured_hour)"
+        )
+
     def _initialize(self):
         with self._connect() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS payload_snapshots (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    captured_at TEXT NOT NULL,
-                    captured_hour TEXT NOT NULL,
-                    source_log_file TEXT,
-                    source_url TEXT,
-                    payload_hash TEXT NOT NULL UNIQUE,
-                    payload_json TEXT NOT NULL,
-                    credit INTEGER,
-                    credit_all INTEGER,
-                    sp INTEGER,
-                    sp_use INTEGER,
-                    playtime INTEGER,
-                    firstboot TEXT,
-                    lastsave TEXT,
-                    version INTEGER
-                )
-                """
-            )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_payload_snapshots_captured_at ON payload_snapshots(captured_at)"
-            )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_payload_snapshots_captured_hour ON payload_snapshots(captured_hour)"
-            )
+            self._create_table(connection)
+            if self._needs_migration(connection):
+                self._migrate_schema(connection)
+                self._create_table(connection)
 
     @staticmethod
     def _normalize_int(value):
@@ -77,7 +152,7 @@ class StatsStore:
     def _row_to_dict(row):
         return dict(row) if row is not None else None
 
-    def record_payload(self, payload, source_log_file=None, source_url=None, captured_at=None):
+    def record_payload(self, payload, source_log_file=None, source_url=None, captured_at=None, event_key=None):
         if not isinstance(payload, dict):
             raise ValueError("payload 必须是字典")
 
@@ -95,6 +170,7 @@ class StatsStore:
             "captured_hour": captured_hour,
             "source_log_file": self._normalize_text(source_log_file),
             "source_url": self._normalize_text(source_url),
+            "event_key": self._normalize_text(event_key),
             "payload_hash": payload_hash,
             "payload_json": payload_json,
             "credit": self._normalize_int(payload.get("credit")),
@@ -107,43 +183,46 @@ class StatsStore:
             "version": self._normalize_int(payload.get("version")),
         }
 
-        with self._connect() as connection:
-            cursor = connection.execute(
-                """
-                INSERT OR IGNORE INTO payload_snapshots (
-                    captured_at,
-                    captured_hour,
-                    source_log_file,
-                    source_url,
-                    payload_hash,
-                    payload_json,
-                    credit,
-                    credit_all,
-                    sp,
-                    sp_use,
-                    playtime,
-                    firstboot,
-                    lastsave,
-                    version
-                ) VALUES (
-                    :captured_at,
-                    :captured_hour,
-                    :source_log_file,
-                    :source_url,
-                    :payload_hash,
-                    :payload_json,
-                    :credit,
-                    :credit_all,
-                    :sp,
-                    :sp_use,
-                    :playtime,
-                    :firstboot,
-                    :lastsave,
-                    :version
-                )
-                """,
-                values,
+        insert_sql = """
+            INSERT INTO payload_snapshots (
+                captured_at,
+                captured_hour,
+                source_log_file,
+                source_url,
+                event_key,
+                payload_hash,
+                payload_json,
+                credit,
+                credit_all,
+                sp,
+                sp_use,
+                playtime,
+                firstboot,
+                lastsave,
+                version
+            ) VALUES (
+                :captured_at,
+                :captured_hour,
+                :source_log_file,
+                :source_url,
+                :event_key,
+                :payload_hash,
+                :payload_json,
+                :credit,
+                :credit_all,
+                :sp,
+                :sp_use,
+                :playtime,
+                :firstboot,
+                :lastsave,
+                :version
             )
+        """
+        if values["event_key"]:
+            insert_sql = insert_sql.replace("INSERT INTO", "INSERT OR IGNORE INTO", 1)
+
+        with self._connect() as connection:
+            cursor = connection.execute(insert_sql, values)
             return cursor.rowcount > 0
 
     def get_today_summary(self, day=None):
@@ -268,6 +347,8 @@ class StatsStore:
                 last_value = last_values.get(hour_key, {}).get(field)
                 if first_value is None or last_value is None:
                     row[field] = 0
+                elif field == "sp":
+                    row[field] = max(0, first_value - last_value)
                 else:
                     row[field] = max(0, last_value - first_value)
 
@@ -277,7 +358,7 @@ class StatsStore:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT captured_at, source_log_file, credit, credit_all, sp, sp_use, playtime, firstboot, lastsave, version
+                SELECT captured_at, source_log_file, source_url, event_key, credit, credit_all, sp, sp_use, playtime, firstboot, lastsave, version
                 FROM payload_snapshots
                 ORDER BY captured_at DESC, id DESC
                 LIMIT ?
