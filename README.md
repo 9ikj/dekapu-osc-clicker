@@ -12,15 +12,22 @@
 - 点击频率会自动保存并在下次启动时恢复
 - 选择 VRChat 日志目录后自动保存
 - 发送语言勾选状态会自动保存并在下次启动时恢复
-- 自动监听最新 `output_log_*.txt`
-- 发现新的 `[DSM SaveURL] Generated URL:` 后自动提取 `sp`（Skill Points）
+- 程序启动后自动监听最新 `output_log_*.txt`，直到退出程序才停止
+- 发现新的 `[DSM SaveURL] Generated URL:` 后自动提取 `sp`（Skill Points）并写入 SQLite 统计库
+- 发送 OSC 聊天框消息可单独开关，不影响日志监听和统计记录
 - 自动发送聊天框消息，支持中文 / 英语 / 日语按固定顺序轮换
 - 聊天框消息按换行显示“当前 Skill Points（当前SP）”和“今日已用 Skill Points（今日已用SP）”
-- 今日已用 Skill Points（今日已用SP）按“当天软件第一次读取到的 Skill Points”开始累计，重开软件后仍可继续计算
+- 今日已用 Skill Points（今日已用SP）按“当天数据库首条 SP 记录”和“当前 SP”推算，重开软件后仍可继续计算
 - 可勾选要参与发送的语言：中文 / 英语 / 日语（至少保留一种）
 - 英语使用 `K / M / B / T` 单位
 - 中文使用 `万 / 亿 / 万亿` 单位
 - 日语使用 `万 / 億 / 兆` 单位
+- 内置统计网页，固定端口 `45600`
+- 第一页显示今日净增 credit 与“每小时 credit 增减”图表
+- 第二页显示 `credit / credit_all / sp / sp_use` 的每小时真实数值（取该小时最后一条记录）
+- 统计页支持自动刷新
+- 统计页支持本机访问或勾选后局域网访问，并可立即无感重绑
+- 统计服务在程序启动时自动启动，不需要先点击“统计”按钮
 - GitHub Actions Release 打包时可将版本号注入窗口标题
 - 支持最小化到系统托盘，并可从托盘恢复窗口
 - 仅允许打开一个实例；重复启动时通过 Windows 单实例互斥与窗口激活机制唤醒并显示已打开的窗口（若原窗口已最小化/在托盘中则直接恢复显示）
@@ -59,9 +66,12 @@ python -m dekapu_osc_clicker
 3. 点击“浏览”选择 VRChat 日志目录
 4. 点击“开始”或按 `F1` 开始点击
 5. 点击“停止”或按 `F2` 停止点击
-6. 勾选“自动监听最新日志并发送 Skill Points（SP）”启用自动监听
-7. 在界面中勾选要参与发送的语言：中文 / 英语 / 日语
-8. 点击窗口关闭按钮或最小化时，程序会进入系统托盘；可从托盘菜单重新打开或退出
+6. 程序会自动监听最新 VRChat 日志并记录统计数据
+7. 如需发送 OSC 聊天框消息，保持“发送 OSC 聊天框 SP 消息”勾选
+8. 在界面中勾选要参与发送的语言：中文 / 英语 / 日语
+9. 点击“统计”打开统计页；也可以在程序启动后直接访问 `http://127.0.0.1:45600/`
+10. 如需局域网访问，勾选“允许局域网访问统计页面”后用 `http://<本机IP>:45600/` 访问
+11. 点击窗口关闭按钮或最小化时，程序会进入系统托盘；可从托盘菜单重新打开或退出
 
 点击频率当前限制范围：
 
@@ -92,9 +102,9 @@ C:\Users\你的用户名\AppData\LocalLow\VRChat\VRChat
 4. 读取 URL 中的 `data` 参数
 5. base64 解码并解析 JSON
 6. 取出 `sp`（Skill Points）
-7. 记录当天第一次读取到的 Skill Points 作为今日起点
-8. 计算今日SP = 今日起点SP - 当前剩余SP（最小显示为 0）
-9. 按固定语言顺序（中文 → 英语 → 日语，仅跳过未勾选语言）发送两行聊天框消息
+7. 将解析出的数据写入 `stats.db`
+8. 按当天数据库首条 `sp` 与当前 `sp` 推算今日已用 SP
+9. 若已开启“发送 OSC 聊天框 SP 消息”，则按固定语言顺序（中文 → 英语 → 日语，仅跳过未勾选语言）发送两行聊天框消息
 
 说明：
 - 今日已用SP是本工具基于“当天第一次读取到的当前 SP”和“当前 SP”之间的差值推算出来的
@@ -137,6 +147,8 @@ settings.json
 - `log_dir`
 - `click_delay_ms`
 - `languages`
+- `send_enabled`
+- `stats_web_allow_lan`
 
 程序会对配置做基础容错：
 
@@ -150,6 +162,7 @@ settings.json
 ├─ README.md
 ├─ requirements.txt
 ├─ settings.json
+├─ stats.db
 ├─ dekapu_osc_clicker.py
 ├─ build.ps1
 ├─ tools/
@@ -167,6 +180,9 @@ settings.json
    ├─ log_monitor.py
    ├─ osc_client.py
    ├─ settings.py
+   ├─ single_instance.py
+   ├─ stats_store.py
+   ├─ stats_web.py
    ├─ tray.py
    └─ ui.py
 ```
@@ -212,6 +228,7 @@ dist/dekapu-osc-clicker.exe
 - 确认 VRChat 已开启 OSC
 - 确认日志目录选择正确
 - 确认最新日志里确实出现了 `[DSM SaveURL] Generated URL:`
+- 若统计页已有数据但聊天框没有发送，检查“发送 OSC 聊天框 SP 消息”是否被取消勾选
 
 ### 2. 热键没反应
 - 某些环境下 `keyboard` 可能需要更高权限运行
@@ -224,6 +241,11 @@ dist/dekapu-osc-clicker.exe
 - 当天第一次读取到 Skill Points（SP）时，会把这条记录作为今日起点
 - 所以第一条消息里的今日已用SP正常就是 0
 - 这表示“今天的起始读数”，不是读取失败
+
+### 5. 为什么手动输入 `http://127.0.0.1:45600/` 现在可以直接打开
+- 统计服务会在程序启动时自动启动
+- 因此不需要先点击程序里的“统计”按钮
+- 若勾选“允许局域网访问统计页面”，也可通过 `http://<本机IP>:45600/` 访问
 
 ## 术语说明
 
