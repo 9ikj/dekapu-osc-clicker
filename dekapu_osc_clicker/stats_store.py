@@ -305,9 +305,11 @@ class StatsStore:
         if not valid_fields:
             valid_fields = ["credit"]
 
-        day_text = day or datetime.now().strftime("%Y-%m-%d")
+        now = datetime.now()
+        day_text = day or now.strftime("%Y-%m-%d")
         day_start = f"{day_text} 00:00:00"
         day_end = f"{day_text} 23:59:59"
+        current_hour_key = now.strftime("%Y-%m-%d %H:00:00") if day_text == now.strftime("%Y-%m-%d") else None
         select_fields = ", ".join(valid_fields)
         hour_buckets = {
             f"{day_text} {hour:02d}:00:00": {"hour": f"{hour:02d}:00", "captured_hour": f"{day_text} {hour:02d}:00:00"}
@@ -342,11 +344,14 @@ class StatsStore:
                 last_values.setdefault(hour_key, {})[field] = value
 
         for hour_key, row in hour_buckets.items():
+            is_current_hour = hour_key == current_hour_key
             for field in valid_fields:
                 first_value = first_values.get(hour_key, {}).get(field)
                 last_value = last_values.get(hour_key, {}).get(field)
                 if first_value is None or last_value is None:
                     row[field] = 0
+                elif is_current_hour:
+                    row[field] = last_value
                 elif field == "sp":
                     row[field] = max(0, first_value - last_value)
                 else:

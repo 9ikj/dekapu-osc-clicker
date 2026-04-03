@@ -19,6 +19,7 @@ class MainWindow:
         self.delay_var = tk.StringVar(value=str(self.app.get_saved_click_delay_ms() or DEFAULT_CLICK_DELAY_MS))
         self.log_dir_var = tk.StringVar(value=self.app.get_saved_log_dir())
         self.send_enabled_var = tk.BooleanVar(value=self.app.get_send_enabled())
+        self.stats_web_allow_lan_var = tk.BooleanVar(value=self.app.get_stats_web_allow_lan())
 
         saved_languages = set(self.app.get_saved_languages())
         self.language_zh_var = tk.BooleanVar(value="zh" in saved_languages)
@@ -75,15 +76,22 @@ class MainWindow:
         tk.Label(frame, text="热键：F1 开始，F2 停止").grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
         button_frame = tk.Frame(frame)
-        button_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(16, 0))
-        tk.Button(button_frame, text="开始", width=12, command=self._start_clicking).pack(side="left")
-        tk.Button(button_frame, text="停止", width=12, command=self._stop_clicking).pack(side="left", padx=(12, 0))
-        tk.Button(button_frame, text="统计", width=12, command=self.open_stats_page).pack(side="right")
+        button_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(8, 0))
 
-        tk.Checkbutton(frame, text="发送 OSC 聊天框 SP 消息", variable=self.send_enabled_var, command=self._toggle_send_enabled).grid(row=5, column=0, columnspan=3, sticky="w", pady=(12, 0))
+        left_button_frame = tk.Frame(button_frame)
+        left_button_frame.pack(side="left")
+        tk.Button(left_button_frame, text="开始", width=12, command=self._start_clicking).pack(side="left")
+        tk.Button(left_button_frame, text="停止", width=12, command=self._stop_clicking).pack(side="left", padx=(12, 0))
+
+        stats_button_frame = tk.Frame(button_frame)
+        stats_button_frame.pack(side="right", anchor="ne")
+        tk.Button(stats_button_frame, text="统计", width=12, command=self.open_stats_page).pack(anchor="e")
+        tk.Checkbutton(stats_button_frame, text="允许局域网访问统计页面", variable=self.stats_web_allow_lan_var, command=self._toggle_stats_web_allow_lan).pack(anchor="e", pady=(4, 0))
+
+        tk.Checkbutton(frame, text="发送 OSC 聊天框 SP 消息", variable=self.send_enabled_var, command=self._toggle_send_enabled).grid(row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
         language_frame = tk.Frame(frame)
-        language_frame.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        language_frame.grid(row=6, column=0, columnspan=3, sticky="w", pady=(6, 0))
         tk.Label(language_frame, text="发送语言：").pack(side="left")
         tk.Checkbutton(language_frame, text="中文", variable=self.language_zh_var, command=lambda: self._on_language_toggle("zh")).pack(side="left")
         tk.Checkbutton(language_frame, text="英语", variable=self.language_en_var, command=lambda: self._on_language_toggle("en")).pack(side="left")
@@ -217,6 +225,15 @@ class MainWindow:
             self.set_status("状态：监听中，已开启 OSC 聊天框发送")
         else:
             self.set_status("状态：监听中，已关闭 OSC 聊天框发送")
+
+    def _toggle_stats_web_allow_lan(self):
+        allow_lan = self.stats_web_allow_lan_var.get()
+        self.app.save_stats_web_allow_lan(allow_lan)
+        self.app.restart_stats_web()
+        if allow_lan:
+            self.set_status("状态：已立即切换统计页面访问范围，当前监听 0.0.0.0:45600")
+        else:
+            self.set_status("状态：已立即切换统计页面访问范围，当前监听 127.0.0.1:45600")
 
     def run(self):
         self.root.mainloop()

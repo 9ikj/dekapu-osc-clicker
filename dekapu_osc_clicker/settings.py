@@ -13,6 +13,7 @@ DEFAULT_SETTINGS = {
     "click_delay_ms": 200,
     "languages": DEFAULT_LANGUAGE_ORDER[:],
     "send_enabled": True,
+    "stats_web_allow_lan": False,
 }
 
 
@@ -47,6 +48,7 @@ class SettingsStore:
         merged["languages"] = self._sanitize_languages(merged.get("languages"))
         merged["log_dir"] = str(merged.get("log_dir", "") or "")
         merged["send_enabled"] = bool(merged.get("send_enabled", True))
+        merged["stats_web_allow_lan"] = bool(merged.get("stats_web_allow_lan", False))
 
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self.file_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -103,3 +105,9 @@ class SettingsStore:
 
     def set_send_enabled(self, send_enabled):
         self.update(send_enabled=bool(send_enabled))
+
+    def get_stats_web_allow_lan(self):
+        return bool(self.load().get("stats_web_allow_lan", DEFAULT_SETTINGS["stats_web_allow_lan"]))
+
+    def set_stats_web_allow_lan(self, allow_lan):
+        self.update(stats_web_allow_lan=bool(allow_lan))

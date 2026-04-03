@@ -16,7 +16,7 @@ class DekapuOscClickerApp:
     def __init__(self):
         self.settings = SettingsStore()
         self.stats_store = StatsStore(get_stats_db_file())
-        self.stats_web = StatsWebServer(self.stats_store)
+        self.stats_web = StatsWebServer(self.stats_store, get_bind_host=self.get_stats_web_bind_host)
         self.osc_client = VRChatOSCClient()
         self.ui = None
         self.hotkey_f1 = None
@@ -56,6 +56,15 @@ class DekapuOscClickerApp:
 
     def save_send_enabled(self, send_enabled):
         self.settings.set_send_enabled(send_enabled)
+
+    def get_stats_web_allow_lan(self):
+        return self.settings.get_stats_web_allow_lan()
+
+    def save_stats_web_allow_lan(self, allow_lan):
+        self.settings.set_stats_web_allow_lan(allow_lan)
+
+    def get_stats_web_bind_host(self):
+        return "0.0.0.0" if self.get_stats_web_allow_lan() else "127.0.0.1"
 
     @staticmethod
     def get_click_delay_limits_ms():
@@ -97,6 +106,22 @@ class DekapuOscClickerApp:
 
     def stop_monitoring(self):
         self.log_monitor.stop()
+
+    def start_stats_web(self):
+        try:
+            self.stats_web.ensure_started()
+        except Exception as exc:
+            if self.ui is not None:
+                self.ui.set_status(f"状态：统计页面服务启动失败：{exc}")
+            return False
+        return True
+
+    def restart_stats_web(self):
+        was_running = self.stats_web.server is not None
+        self.stats_web.stop()
+        if was_running:
+            self.stats_web.ensure_started()
+        return was_running
 
     def open_stats_page(self):
         return self.stats_web.open_page("/")
@@ -158,6 +183,7 @@ def main():
 
     ui = MainWindow(app)
     app.attach_ui(ui)
+    app.start_stats_web()
     app.register_hotkeys()
     ui.apply_startup_monitoring_state(*app.try_start_saved_monitoring())
     ui.run()

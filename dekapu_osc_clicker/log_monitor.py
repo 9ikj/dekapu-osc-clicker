@@ -113,7 +113,6 @@ class LogMonitor:
     def _record_payload(self, payload, log_file, source_url, line_start_offset=None):
         db_path = getattr(self.stats_store, "db_path", None)
         db_path_text = str(db_path) if db_path else "<unknown>"
-        self._debug_log(f"payload ready for stats db={db_path_text}: {payload}")
         if self.stats_store is None:
             return
         try:
@@ -195,7 +194,6 @@ class LogMonitor:
             if self.waiting_for_generated_url:
                 if not stripped_line:
                     continue
-                self._debug_log(f"using next line as DSM url: {stripped_line}")
                 self.waiting_for_generated_url = False
                 try:
                     self._handle_generated_url(stripped_line, log_file, line_start_offset=line_start_offset)

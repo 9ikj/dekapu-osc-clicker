@@ -4,10 +4,13 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from .constants import STATS_WEB_PORT
+
 
 class StatsWebServer:
-    def __init__(self, stats_store):
+    def __init__(self, stats_store, get_bind_host=None):
         self.stats_store = stats_store
+        self.get_bind_host = get_bind_host or (lambda: "127.0.0.1")
         self.server = None
         self.thread = None
         self._lock = threading.Lock()
@@ -18,7 +21,8 @@ class StatsWebServer:
                 return self.base_url
 
             handler = self._build_handler()
-            self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            bind_host = self.get_bind_host()
+            self.server = ThreadingHTTPServer((bind_host, STATS_WEB_PORT), handler)
             self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
             self.thread.start()
             return self.base_url
@@ -27,8 +31,8 @@ class StatsWebServer:
     def base_url(self):
         if self.server is None:
             raise RuntimeError("统计服务尚未启动")
-        host, port = self.server.server_address
-        return f"http://{host}:{port}"
+        _host, port = self.server.server_address
+        return f"http://127.0.0.1:{port}"
 
     def open_page(self, path="/"):
         base_url = self.ensure_started()
