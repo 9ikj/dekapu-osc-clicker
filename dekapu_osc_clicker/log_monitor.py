@@ -2,7 +2,6 @@ from pathlib import Path
 from threading import Event, Thread
 
 from .constants import LOG_FILE_PATTERN, MONITOR_POLL_INTERVAL
-from .daily_sp import DailySPTracker
 from .dsm_parser import extract_generated_url_from_line, extract_last_generated_url, extract_payload_from_generated_url
 
 
@@ -18,7 +17,6 @@ class LogMonitor:
         self.waiting_for_generated_url = False
         self.selected_languages = ["zh", "en", "ja"]
         self.language_index = 0
-        self.daily_sp_tracker = DailySPTracker()
 
     def _set_status(self, text):
         self.status_callback(text)
@@ -85,7 +83,12 @@ class LogMonitor:
             self.language_index = (self.language_index + 1) % len(self.selected_languages)
 
     def _prepare_message(self, sp_value):
-        _daily_data, today_used = self.daily_sp_tracker.update(sp_value)
+        today_used = 0
+        if self.stats_store is not None:
+            try:
+                today_used = self.stats_store.get_today_sp_used(sp_value)
+            except Exception as exc:
+                self._debug_log(f"failed to query today sp usage: {exc}")
         language = self._get_current_language()
         message = self._build_sp_message(sp_value, today_used, language)
         return message, today_used, language

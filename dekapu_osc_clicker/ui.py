@@ -146,6 +146,11 @@ class MainWindow:
     def schedule_status(self, text):
         self.root.after(0, lambda: self.set_status(text))
 
+    def apply_startup_monitoring_state(self, started, error_message=None):
+        self.monitor_var.set(started)
+        if not started and error_message:
+            self.set_status(f"状态：{error_message}")
+
     def open_stats_page(self):
         try:
             self.app.open_stats_page()

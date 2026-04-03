@@ -132,25 +132,16 @@ SP Used Today: 560K
 settings.json
 ```
 
-以及今日 Skill Points（SP）记录文件：
-
-```text
-daily_sp.json
-```
-
 当前用于保存：
 
 - `log_dir`
 - `click_delay_ms`
 - `languages`
-- 当天 `first_sp` / `last_sp`
-- 最近一次更新的 `updated_at`
 
 程序会对配置做基础容错：
 
 - 非法点击频率会自动回退/夹紧到允许范围
 - 非法语言列表会自动恢复为默认值
-- `daily_sp.json` 异常时会自动回退并重新生成
 
 ## 项目结构
 
@@ -159,7 +150,6 @@ daily_sp.json
 ├─ README.md
 ├─ requirements.txt
 ├─ settings.json
-├─ daily_sp.json
 ├─ dekapu_osc_clicker.py
 ├─ build.ps1
 ├─ tools/
@@ -173,7 +163,6 @@ daily_sp.json
    │  └─ sp_assistant_icon.svg
    ├─ clicker.py
    ├─ constants.py
-   ├─ daily_sp.py
    ├─ dsm_parser.py
    ├─ log_monitor.py
    ├─ osc_client.py

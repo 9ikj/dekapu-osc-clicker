@@ -18,7 +18,6 @@ dist/
 build_version_hook.py
 
 settings.json
-daily_sp.json
 stats.db
 .claude_test_stats.db
 .claude_test_stats_live.db

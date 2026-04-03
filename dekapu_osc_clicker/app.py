@@ -78,6 +78,15 @@ class DekapuOscClickerApp:
     def start_monitoring(self, log_dir, selected_languages):
         return self.log_monitor.start(lambda: log_dir, selected_languages)
 
+    def try_start_saved_monitoring(self):
+        log_dir = self.get_saved_log_dir().strip()
+        selected_languages = self.get_saved_languages()
+        try:
+            self.start_monitoring(log_dir, selected_languages)
+        except ValueError as exc:
+            return False, str(exc)
+        return True, None
+
     def stop_monitoring(self):
         self.log_monitor.stop()
 
@@ -142,4 +151,5 @@ def main():
     ui = MainWindow(app)
     app.attach_ui(ui)
     app.register_hotkeys()
+    ui.apply_startup_monitoring_state(*app.try_start_saved_monitoring())
     ui.run()

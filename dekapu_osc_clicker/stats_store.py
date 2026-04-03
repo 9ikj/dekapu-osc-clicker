@@ -189,6 +189,31 @@ class StatsStore:
             "snapshot_count": total_snapshots,
         }
 
+    def get_today_sp_used(self, current_sp, day=None):
+        day_text = day or datetime.now().strftime("%Y-%m-%d")
+        day_start = f"{day_text} 00:00:00"
+        day_end = f"{day_text} 23:59:59"
+        current_sp_value = self._normalize_int(current_sp)
+        if current_sp_value is None:
+            return 0
+
+        with self._connect() as connection:
+            first_row = connection.execute(
+                """
+                SELECT sp
+                FROM payload_snapshots
+                WHERE captured_at BETWEEN ? AND ? AND sp IS NOT NULL
+                ORDER BY captured_at ASC, id ASC
+                LIMIT 1
+                """,
+                (day_start, day_end),
+            ).fetchone()
+
+        first_sp = self._normalize_int(first_row["sp"] if first_row else None)
+        if first_sp is None:
+            return 0
+        return max(0, first_sp - current_sp_value)
+
     def get_hourly_credit(self, day=None):
         return self._get_hourly_changes(("credit",), day=day)
 
