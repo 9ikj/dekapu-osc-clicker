@@ -79,6 +79,12 @@ class StatsWebServer:
                     fields = params.get("fields", [""])[0].split(",") if "fields" in params else None
                     self._send_json(stats_store.get_hourly_changes(fields=fields, day=day))
                     return
+                if parsed.path == "/api/hourly-values":
+                    params = parse_qs(parsed.query)
+                    day = params.get("day", [None])[0]
+                    fields = params.get("fields", [""])[0].split(",") if "fields" in params else None
+                    self._send_json(stats_store.get_hourly_values(fields=fields, day=day))
+                    return
                 self.send_error(404)
 
             def log_message(self, format, *args):
@@ -197,13 +203,13 @@ def _build_index_html():
     <section class=\"hero\">
       <div>
         <h1 class=\"hero-title\">实时统计面板</h1>
-        <p class=\"hero-subtitle\">自动刷新今日 credit 进度与每小时变化</p>
+        <p class=\"hero-subtitle\">自动刷新今日 credit 进度与每小时增减变化</p>
         <div class=\"metric-label\">今日净增 credit</div>
         <div id=\"totalCredit\" class=\"hero-metric\">加载中...</div>
       </div>
       <div class=\"row nav\">
         <a href=\"/\">首页</a>
-        <a href=\"/changes\">每小时变化</a>
+        <a href=\"/changes\">每小时数值</a>
       </div>
     </section>
 
@@ -215,7 +221,7 @@ def _build_index_html():
 
       <div class=\"card\">
         <div class=\"chart-title\">
-          <h2>每小时 credit</h2>
+          <h2>每小时 credit 增减</h2>
           <div class=\"row switch\">
             <button id=\"barBtn\" class=\"active\">柱状图</button>
             <button id=\"lineBtn\">折线图</button>
@@ -268,6 +274,43 @@ def _build_index_html():
       refreshDashboard();
     }
 
+    function getChartMetrics(rows) {
+      const values = rows.map(row => Number(row.credit || 0));
+      const minValue = Math.min(...values, 0);
+      const maxValue = Math.max(...values, 0);
+      const range = Math.max(maxValue - minValue, 1);
+      return { minValue, maxValue, range };
+    }
+
+    function getYPosition(value, padding, innerHeight, minValue, maxValue) {
+      return padding + (maxValue - value) / Math.max(maxValue - minValue, 1) * innerHeight;
+    }
+
+    function formatAxisValue(value) {
+      const absValue = Math.abs(Number(value || 0));
+      if (absValue >= 100000000) {
+        return `${(value / 100000000).toFixed(absValue >= 1000000000 ? 0 : 1).replace(/\.0$/, '')}亿`;
+      }
+      if (absValue >= 10000) {
+        return `${(value / 10000).toFixed(absValue >= 100000 ? 0 : 1).replace(/\.0$/, '')}万`;
+      }
+      return formatNumber(Math.round(value));
+    }
+
+    function buildYAxis(width, padding, innerHeight, minValue, maxValue) {
+      const ticks = 5;
+      const labels = [];
+      for (let i = 0; i < ticks; i += 1) {
+        const ratio = i / (ticks - 1);
+        const value = maxValue - (maxValue - minValue) * ratio;
+        const y = padding + innerHeight * ratio;
+        labels.push({ value, y });
+      }
+      return labels.map(({ value, y }) => (
+        `<text x="${padding - 10}" y="${y + 4}" fill="#94a3b8" font-size="11" text-anchor="end">${formatAxisValue(value)}</text>`
+      )).join('');
+    }
+
     async function loadSummary() {
       const response = await fetch('/api/today-summary');
       const data = await response.json();
@@ -283,16 +326,20 @@ def _build_index_html():
       const width = 1000;
       const height = 420;
       const padding = 42;
-      const values = rows.map(row => Number(row.credit || 0));
-      const maxValue = Math.max(...values, 1);
+      const { minValue, maxValue } = getChartMetrics(rows);
       const innerWidth = width - padding * 2;
       const innerHeight = height - padding * 2;
       const barWidth = innerWidth / rows.length;
+      const zeroY = getYPosition(0, padding, innerHeight, minValue, maxValue);
       let out = `
         <defs>
-          <linearGradient id=\"barGradient\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <linearGradient id=\"barGradientPositive\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
             <stop offset=\"0%\" stop-color=\"#60a5fa\" />
             <stop offset=\"100%\" stop-color=\"#2563eb\" />
+          </linearGradient>
+          <linearGradient id=\"barGradientNegative\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+            <stop offset=\"0%\" stop-color=\"#fb7185\" />
+            <stop offset=\"100%\" stop-color=\"#e11d48\" />
           </linearGradient>
         </defs>
       `;
@@ -300,12 +347,17 @@ def _build_index_html():
         const y = padding + (innerHeight / 4) * i;
         out += `<line x1=\"${padding}\" y1=\"${y}\" x2=\"${width-padding}\" y2=\"${y}\" stroke=\"rgba(148,163,184,0.12)\" />`;
       }
+      out += buildYAxis(width, padding, innerHeight, minValue, maxValue);
+      out += `<line x1=\"${padding}\" y1=\"${zeroY}\" x2=\"${width-padding}\" y2=\"${zeroY}\" stroke=\"rgba(226,232,240,0.35)\" stroke-width=\"1.5\" />`;
       rows.forEach((row, index) => {
+        const value = Number(row.credit || 0);
         const x = padding + index * barWidth + 5;
-        const barHeight = (Number(row.credit || 0) / maxValue) * (innerHeight - 20);
-        const y = height - padding - barHeight;
+        const valueY = getYPosition(value, padding, innerHeight, minValue, maxValue);
+        const rectY = Math.min(valueY, zeroY);
+        const rectHeight = Math.max(Math.abs(zeroY - valueY), 2);
         const labelX = x + Math.max(barWidth - 10, 10) / 2;
-        out += `<rect x=\"${x}\" y=\"${y}\" width=\"${Math.max(barWidth - 10, 10)}\" height=\"${barHeight}\" fill=\"url(#barGradient)\" rx=\"8\" />`;
+        const fill = value >= 0 ? 'url(#barGradientPositive)' : 'url(#barGradientNegative)';
+        out += `<rect x=\"${x}\" y=\"${rectY}\" width=\"${Math.max(barWidth - 10, 10)}\" height=\"${rectHeight}\" fill=\"${fill}\" rx=\"8\" />`;
         out += `<text x=\"${labelX}\" y=\"${height-padding+18}\" fill=\"#94a3b8\" font-size=\"10\" text-anchor=\"middle\">${row.hour.slice(0,2)}</text>`;
       });
       svg.innerHTML = out;
@@ -316,14 +368,14 @@ def _build_index_html():
       const width = 1000;
       const height = 420;
       const padding = 42;
-      const values = rows.map(row => Number(row.credit || 0));
-      const maxValue = Math.max(...values, 1);
+      const { minValue, maxValue } = getChartMetrics(rows);
       const innerWidth = width - padding * 2;
       const innerHeight = height - padding * 2;
       const stepX = innerWidth / Math.max(rows.length - 1, 1);
+      const zeroY = getYPosition(0, padding, innerHeight, minValue, maxValue);
       const points = rows.map((row, index) => {
         const x = padding + index * stepX;
-        const y = height - padding - (Number(row.credit || 0) / maxValue) * (innerHeight - 20);
+        const y = getYPosition(Number(row.credit || 0), padding, innerHeight, minValue, maxValue);
         return { x, y, label: row.hour.slice(0,2) };
       });
       let out = `
@@ -338,7 +390,9 @@ def _build_index_html():
         const y = padding + (innerHeight / 4) * i;
         out += `<line x1=\"${padding}\" y1=\"${y}\" x2=\"${width-padding}\" y2=\"${y}\" stroke=\"rgba(148,163,184,0.12)\" />`;
       }
-      const areaPoints = [`${padding},${height-padding}`, ...points.map(p => `${p.x},${p.y}`), `${width-padding},${height-padding}`].join(' ');
+      out += buildYAxis(width, padding, innerHeight, minValue, maxValue);
+      out += `<line x1=\"${padding}\" y1=\"${zeroY}\" x2=\"${width-padding}\" y2=\"${zeroY}\" stroke=\"rgba(226,232,240,0.35)\" stroke-width=\"1.5\" />`;
+      const areaPoints = [`${padding},${zeroY}`, ...points.map(p => `${p.x},${p.y}`), `${width-padding},${zeroY}`].join(' ');
       out += `<polygon fill=\"url(#lineArea)\" points=\"${areaPoints}\" />`;
       out += `<polyline fill=\"none\" stroke=\"#34d399\" stroke-width=\"4\" stroke-linejoin=\"round\" stroke-linecap=\"round\" points=\"${points.map(p => `${p.x},${p.y}`).join(' ')}\" />`;
       points.forEach(point => {
@@ -353,7 +407,7 @@ def _build_index_html():
       const response = await fetch('/api/hourly-credit');
       const data = await response.json();
       const rows = data.rows || [];
-      const hasData = rows.some(row => Number(row.credit || 0) > 0);
+      const hasData = rows.some(row => Number(row.credit || 0) !== 0);
       document.getElementById('chart').style.display = hasData ? 'block' : 'none';
       document.getElementById('chartEmpty').style.display = hasData ? 'none' : 'flex';
       if (!hasData) {
@@ -395,7 +449,7 @@ def _build_changes_html():
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>每小时变化</title>
+  <title>每小时数值</title>
   <style>
     :root {
       --bg: #09111f;
@@ -465,15 +519,15 @@ def _build_changes_html():
   <div class=\"wrap\">
     <section class=\"hero\">
       <div>
-        <h1>每小时变化</h1>
-        <p>自动刷新 credit、credit_all、sp、sp_use 变化数据</p>
+        <h1>每小时真实数值</h1>
+        <p>自动刷新 credit、credit_all、sp、sp_use 每小时最终真实值</p>
       </div>
       <a href=\"/\">返回首页</a>
     </section>
 
     <section class=\"card\">
       <div class=\"header-row\">
-        <h2>小时明细</h2>
+        <h2>小时数值</h2>
         <span id=\"lastUpdated\" class=\"pill\">最后更新时间：--</span>
       </div>
       <div class=\"table-wrap\">
@@ -529,7 +583,7 @@ def _build_changes_html():
     }
 
     async function loadRows() {
-      const response = await fetch('/api/hourly-changes?fields=credit,credit_all,sp,sp_use');
+      const response = await fetch('/api/hourly-values?fields=credit,credit_all,sp,sp_use');
       const data = await response.json();
       const tbody = document.getElementById('rows');
       const rows = data.rows || [];

@@ -294,23 +294,23 @@ class StatsStore:
         return max(0, first_sp - current_sp_value)
 
     def get_hourly_credit(self, day=None):
-        return self._get_hourly_changes(("credit",), day=day)
+        return self._get_hourly_deltas(("credit",), day=day)
 
     def get_hourly_changes(self, fields=None, day=None):
         requested_fields = tuple(fields or HOURLY_CHANGE_FIELDS)
-        return self._get_hourly_changes(requested_fields, day=day)
+        return self._get_hourly_deltas(requested_fields, day=day)
 
-    def _get_hourly_changes(self, fields, day=None):
+    def get_hourly_values(self, fields=None, day=None):
+        requested_fields = tuple(fields or HOURLY_CHANGE_FIELDS)
+        return self._get_hourly_values(requested_fields, day=day)
+
+    @staticmethod
+    def _normalize_hourly_fields(fields):
         valid_fields = [field for field in fields if field in HOURLY_CHANGE_FIELDS or field == "credit"]
-        if not valid_fields:
-            valid_fields = ["credit"]
+        return valid_fields or ["credit"]
 
-        now = datetime.now()
-        day_text = day or now.strftime("%Y-%m-%d")
-        day_start = f"{day_text} 00:00:00"
-        day_end = f"{day_text} 23:59:59"
-        current_hour_key = now.strftime("%Y-%m-%d %H:00:00") if day_text == now.strftime("%Y-%m-%d") else None
-        select_fields = ", ".join(valid_fields)
+    @staticmethod
+    def _build_hour_buckets(day_text, valid_fields):
         hour_buckets = {
             f"{day_text} {hour:02d}:00:00": {"hour": f"{hour:02d}:00", "captured_hour": f"{day_text} {hour:02d}:00:00"}
             for hour in range(24)
@@ -318,9 +318,15 @@ class StatsStore:
         for row in hour_buckets.values():
             for field in valid_fields:
                 row[field] = 0
+        return hour_buckets
+
+    def _get_hourly_snapshots_by_hour(self, valid_fields, day_text):
+        day_start = f"{day_text} 00:00:00"
+        day_end = f"{day_text} 23:59:59"
+        select_fields = ", ".join(valid_fields)
 
         with self._connect() as connection:
-            snapshots = connection.execute(
+            return connection.execute(
                 f"""
                 SELECT captured_hour, {select_fields}
                 FROM payload_snapshots
@@ -329,6 +335,12 @@ class StatsStore:
                 """,
                 (day_start, day_end),
             ).fetchall()
+
+    def _get_hourly_deltas(self, fields, day=None):
+        valid_fields = self._normalize_hourly_fields(fields)
+        day_text = day or datetime.now().strftime("%Y-%m-%d")
+        hour_buckets = self._build_hour_buckets(day_text, valid_fields)
+        snapshots = self._get_hourly_snapshots_by_hour(valid_fields, day_text)
 
         first_values = {}
         last_values = {}
@@ -344,18 +356,36 @@ class StatsStore:
                 last_values.setdefault(hour_key, {})[field] = value
 
         for hour_key, row in hour_buckets.items():
-            is_current_hour = hour_key == current_hour_key
             for field in valid_fields:
                 first_value = first_values.get(hour_key, {}).get(field)
                 last_value = last_values.get(hour_key, {}).get(field)
                 if first_value is None or last_value is None:
                     row[field] = 0
-                elif is_current_hour:
-                    row[field] = last_value
-                elif field == "sp":
-                    row[field] = max(0, first_value - last_value)
                 else:
-                    row[field] = max(0, last_value - first_value)
+                    row[field] = last_value - first_value
+
+        return {"date": day_text, "fields": valid_fields, "rows": list(hour_buckets.values())}
+
+    def _get_hourly_values(self, fields, day=None):
+        valid_fields = self._normalize_hourly_fields(fields)
+        day_text = day or datetime.now().strftime("%Y-%m-%d")
+        hour_buckets = self._build_hour_buckets(day_text, valid_fields)
+        snapshots = self._get_hourly_snapshots_by_hour(valid_fields, day_text)
+
+        last_values = {}
+        for snapshot in snapshots:
+            hour_key = snapshot["captured_hour"]
+            if hour_key not in hour_buckets:
+                continue
+            for field in valid_fields:
+                value = self._normalize_int(snapshot[field])
+                if value is None:
+                    continue
+                last_values.setdefault(hour_key, {})[field] = value
+
+        for hour_key, row in hour_buckets.items():
+            for field in valid_fields:
+                row[field] = last_values.get(hour_key, {}).get(field, 0)
 
         return {"date": day_text, "fields": valid_fields, "rows": list(hour_buckets.values())}
 
