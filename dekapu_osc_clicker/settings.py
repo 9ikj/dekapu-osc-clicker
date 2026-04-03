@@ -1,6 +1,7 @@
 import json
-import sys
 from pathlib import Path
+
+from .constants import get_data_dir
 
 
 MIN_CLICK_DELAY_MS = 10
@@ -11,17 +12,12 @@ DEFAULT_SETTINGS = {
     "log_dir": "",
     "click_delay_ms": 200,
     "languages": DEFAULT_LANGUAGE_ORDER[:],
+    "send_enabled": True,
 }
 
 
 def get_settings_file():
-    if getattr(sys, "frozen", False):
-        base_dir = Path(sys.executable).resolve().parent
-    elif sys.argv and sys.argv[0]:
-        base_dir = Path(sys.argv[0]).resolve().parent
-    else:
-        base_dir = Path.cwd()
-    return base_dir / "settings.json"
+    return Path(get_data_dir()) / "settings.json"
 
 
 class SettingsStore:
@@ -50,6 +46,7 @@ class SettingsStore:
         merged["click_delay_ms"] = self._sanitize_click_delay_ms(merged.get("click_delay_ms"))
         merged["languages"] = self._sanitize_languages(merged.get("languages"))
         merged["log_dir"] = str(merged.get("log_dir", "") or "")
+        merged["send_enabled"] = bool(merged.get("send_enabled", True))
 
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self.file_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -100,3 +97,9 @@ class SettingsStore:
 
     def set_languages(self, languages):
         self.update(languages=self._sanitize_languages(languages))
+
+    def get_send_enabled(self):
+        return bool(self.load().get("send_enabled", DEFAULT_SETTINGS["send_enabled"]))
+
+    def set_send_enabled(self, send_enabled):
+        self.update(send_enabled=bool(send_enabled))

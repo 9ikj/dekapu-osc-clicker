@@ -18,7 +18,7 @@ class MainWindow:
 
         self.delay_var = tk.StringVar(value=str(self.app.get_saved_click_delay_ms() or DEFAULT_CLICK_DELAY_MS))
         self.log_dir_var = tk.StringVar(value=self.app.get_saved_log_dir())
-        self.monitor_var = tk.BooleanVar(value=False)
+        self.send_enabled_var = tk.BooleanVar(value=self.app.get_send_enabled())
 
         saved_languages = set(self.app.get_saved_languages())
         self.language_zh_var = tk.BooleanVar(value="zh" in saved_languages)
@@ -80,7 +80,7 @@ class MainWindow:
         tk.Button(button_frame, text="停止", width=12, command=self._stop_clicking).pack(side="left", padx=(12, 0))
         tk.Button(button_frame, text="统计", width=12, command=self.open_stats_page).pack(side="right")
 
-        tk.Checkbutton(frame, text="自动监听最新日志并发送SP", variable=self.monitor_var, command=self._toggle_monitoring).grid(row=5, column=0, columnspan=3, sticky="w", pady=(12, 0))
+        tk.Checkbutton(frame, text="发送 OSC 聊天框 SP 消息", variable=self.send_enabled_var, command=self._toggle_send_enabled).grid(row=5, column=0, columnspan=3, sticky="w", pady=(12, 0))
 
         language_frame = tk.Frame(frame)
         language_frame.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
@@ -147,7 +147,6 @@ class MainWindow:
         self.root.after(0, lambda: self.set_status(text))
 
     def apply_startup_monitoring_state(self, started, error_message=None):
-        self.monitor_var.set(started)
         if not started and error_message:
             self.set_status(f"状态：{error_message}")
 
@@ -211,18 +210,13 @@ class MainWindow:
         languages = self._ensure_at_least_one_language(preferred_language)
         self.app.save_languages(languages)
 
-    def _toggle_monitoring(self):
-        if self.monitor_var.get():
-            try:
-                selected_languages = self._ensure_at_least_one_language("zh")
-                self.app.save_languages(selected_languages)
-                self.app.start_monitoring(self.log_dir_var.get().strip(), selected_languages)
-            except ValueError as exc:
-                self.monitor_var.set(False)
-                self.set_status(f"状态：{exc}")
-                messagebox.showerror("错误", str(exc))
+    def _toggle_send_enabled(self):
+        send_enabled = self.send_enabled_var.get()
+        self.app.save_send_enabled(send_enabled)
+        if send_enabled:
+            self.set_status("状态：监听中，已开启 OSC 聊天框发送")
         else:
-            self.app.stop_monitoring()
+            self.set_status("状态：监听中，已关闭 OSC 聊天框发送")
 
     def run(self):
         self.root.mainloop()

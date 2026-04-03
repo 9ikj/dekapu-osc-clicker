@@ -139,6 +139,10 @@ def _build_index_html():
     }
     .hero-title { font-size: 28px; font-weight: 700; margin: 0 0 6px; }
     .hero-subtitle { color: var(--muted); margin: 0; }
+    .hero-metric {
+      margin-top: 14px; font-size: 34px; font-weight: 800; letter-spacing: .5px;
+      color: var(--text); word-break: break-all;
+    }
     .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
     .nav a, .switch button {
       color: var(--text); background: rgba(51,65,85,0.68); border: 1px solid rgba(148,163,184,0.16);
@@ -190,6 +194,8 @@ def _build_index_html():
       <div>
         <h1 class=\"hero-title\">实时统计面板</h1>
         <p class=\"hero-subtitle\">自动刷新今日 credit 进度与每小时变化</p>
+        <div class=\"metric-label\">今日净增 credit</div>
+        <div id=\"totalCredit\" class=\"hero-metric\">加载中...</div>
       </div>
       <div class=\"row nav\">
         <a href=\"/\">首页</a>
@@ -199,8 +205,6 @@ def _build_index_html():
 
     <section class=\"grid\">
       <div class=\"card\">
-        <div class=\"metric-label\">今日净增 credit</div>
-        <div id=\"totalCredit\" class=\"metric-value\">加载中...</div>
         <div id=\"summaryMeta\" class=\"metric-sub\"></div>
         <div id=\"lastUpdated\" class=\"metric-sub\"><span class=\"status-dot\"></span>最后更新时间：--</div>
       </div>

@@ -51,6 +51,12 @@ class DekapuOscClickerApp:
     def save_languages(self, languages):
         self.settings.set_languages(languages)
 
+    def get_send_enabled(self):
+        return self.settings.get_send_enabled()
+
+    def save_send_enabled(self, send_enabled):
+        self.settings.set_send_enabled(send_enabled)
+
     @staticmethod
     def get_click_delay_limits_ms():
         return MIN_CLICK_DELAY_MS, MAX_CLICK_DELAY_MS
@@ -70,19 +76,21 @@ class DekapuOscClickerApp:
         self.clicker.stop()
 
     def _send_chatbox_message(self, text):
+        if not self.get_send_enabled():
+            return False
         try:
             self.osc_client.send_chatbox_message(text)
         except Exception as exc:
             raise ValueError(f"发送聊天框消息失败：{exc}") from exc
+        return True
 
-    def start_monitoring(self, log_dir, selected_languages):
-        return self.log_monitor.start(lambda: log_dir, selected_languages)
+    def start_monitoring(self, selected_languages):
+        return self.log_monitor.start(self.get_saved_log_dir, selected_languages)
 
     def try_start_saved_monitoring(self):
-        log_dir = self.get_saved_log_dir().strip()
         selected_languages = self.get_saved_languages()
         try:
-            self.start_monitoring(log_dir, selected_languages)
+            self.start_monitoring(selected_languages)
         except ValueError as exc:
             return False, str(exc)
         return True, None

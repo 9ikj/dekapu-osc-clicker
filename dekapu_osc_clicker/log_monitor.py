@@ -96,9 +96,12 @@ class LogMonitor:
     def _send_sp_message(self, sp_value):
         message, _today_used, _language = self._prepare_message(sp_value)
         self._debug_log(f"parsed sp={sp_value}, sending chatbox message: {message}")
-        self.send_chatbox_message(message)
+        sent = self.send_chatbox_message(message)
         self._advance_language()
-        self._set_status(f"状态：监听中，已发送 SP={sp_value}")
+        if sent is False:
+            self._set_status(f"状态：监听中，已记录 SP={sp_value}，OSC 聊天框发送已关闭")
+        else:
+            self._set_status(f"状态：监听中，已发送 SP={sp_value}")
         return message
 
     @staticmethod
@@ -108,6 +111,9 @@ class LogMonitor:
         return f"{log_file.name}:{int(line_start_offset)}"
 
     def _record_payload(self, payload, log_file, source_url, line_start_offset=None):
+        db_path = getattr(self.stats_store, "db_path", None)
+        db_path_text = str(db_path) if db_path else "<unknown>"
+        self._debug_log(f"payload ready for stats db={db_path_text}: {payload}")
         if self.stats_store is None:
             return
         try:
@@ -119,8 +125,8 @@ class LogMonitor:
                 event_key=event_key,
             )
         except Exception as exc:
-            self._debug_log(f"failed to record payload: {exc}")
-            self._set_status(f"状态：监听中，统计写入失败：{exc}")
+            self._debug_log(f"failed to record payload to {db_path_text}: {exc}")
+            self._set_status(f"状态：监听中，统计写入失败：{exc}（数据库：{db_path_text}）")
 
     def _handle_generated_url(self, source_url, log_file, line_start_offset=None):
         payload = extract_payload_from_generated_url(source_url)
