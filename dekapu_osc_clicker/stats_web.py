@@ -232,6 +232,65 @@ def _build_index_html():
       .hero { flex-direction: column; align-items: flex-start; }
       .metric-value { font-size: 38px; }
     }
+    @media (max-width: 640px) {
+      .wrap { padding: 14px; }
+      .hero {
+        padding: 18px;
+        border-radius: 18px;
+        gap: 12px;
+      }
+      .hero-title { font-size: 22px; }
+      .hero-subtitle { font-size: 13px; line-height: 1.6; }
+      .row { gap: 10px; }
+      .nav {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .nav a {
+        width: 100%;
+        text-align: center;
+        padding: 10px 12px;
+      }
+      .summary-grid { gap: 14px; margin-bottom: 14px; }
+      .card {
+        padding: 16px;
+        border-radius: 18px;
+      }
+      .metric-value {
+        font-size: 30px;
+        line-height: 1.15;
+      }
+      .hourly-credit-pill {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        text-align: center;
+      }
+      .chart-title {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .chart-title h2 { font-size: 18px; }
+      .switch {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .switch button {
+        width: 100%;
+      }
+      .chart-shell {
+        padding: 10px;
+        min-height: 320px;
+      }
+      svg { height: 280px; }
+      .empty {
+        min-height: 280px;
+        font-size: 14px;
+        padding: 16px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -569,6 +628,37 @@ def _build_changes_html():
     }
     @media (max-width: 900px) {
       .hero { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 640px) {
+      .wrap { padding: 14px; }
+      .hero {
+        padding: 18px;
+        border-radius: 18px;
+        gap: 12px;
+      }
+      .hero h1 { font-size: 22px; }
+      .hero p { font-size: 13px; line-height: 1.6; }
+      .hero a {
+        width: 100%;
+        text-align: center;
+      }
+      .card {
+        padding: 16px;
+        border-radius: 18px;
+      }
+      .header-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .header-row h2 { font-size: 18px; }
+      .table-wrap {
+        border-radius: 14px;
+      }
+      table { min-width: 620px; }
+      th, td {
+        padding: 12px 10px;
+        font-size: 13px;
+      }
     }
   </style>
 </head>
