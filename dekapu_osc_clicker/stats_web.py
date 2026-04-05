@@ -161,20 +161,29 @@ def _build_index_html():
       border-color: rgba(96,165,250,0.5);
       box-shadow: 0 10px 25px rgba(59,130,246,0.28);
     }
-    .grid { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
+    .summary-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; margin-bottom: 20px; }
     .card {
       background: var(--panel); border: 1px solid var(--panel-border); border-radius: 24px;
       padding: 24px; box-shadow: var(--shadow); backdrop-filter: blur(14px);
     }
     .summary-card {
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      text-align: center;
+      border: 1px solid rgba(148,163,184,0.14);
+      background: linear-gradient(180deg, rgba(11, 19, 35, 0.88), rgba(15, 23, 42, 0.74));
+    }
+    .kpi-card {
+      display: flex; flex-direction: column; justify-content: center;
       border: 1px solid rgba(96,165,250,0.28);
       background: linear-gradient(180deg, rgba(11, 19, 35, 0.92), rgba(15, 23, 42, 0.82));
       box-shadow: 0 0 0 1px rgba(96,165,250,0.08) inset, 0 18px 45px rgba(15, 23, 42, 0.45);
     }
+    .meta-card {
+      display: flex; flex-direction: column; justify-content: center;
+    }
     .metric-label { color: var(--muted); font-size: 14px; }
-    .metric-value { font-size: 48px; font-weight: 800; margin-top: 10px; letter-spacing: .5px; }
+    .metric-value {
+      font-size: 52px; font-weight: 800; margin-top: 10px; letter-spacing: .5px;
+      line-height: 1.1; word-break: break-all;
+    }
     .metric-sub { margin-top: 12px; color: var(--muted); line-height: 1.7; }
     .hourly-credit-pill {
       margin-top: 16px;
@@ -189,13 +198,13 @@ def _build_index_html():
       color: #d1fae5;
       font-size: 14px;
       font-weight: 600;
+      width: fit-content;
     }
     .hourly-credit-label {
       color: #9fe8cc;
       font-weight: 500;
     }
     .summary-meta {
-      margin-top: 18px;
       color: var(--muted);
       line-height: 1.8;
       font-size: 14px;
@@ -219,7 +228,7 @@ def _build_index_html():
       background: rgba(15,23,42,0.45);
     }
     @media (max-width: 900px) {
-      .grid { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr; }
       .hero { flex-direction: column; align-items: flex-start; }
       .metric-value { font-size: 38px; }
     }
@@ -238,18 +247,23 @@ def _build_index_html():
       </div>
     </section>
 
-    <section class=\"grid\">
-      <div class=\"card summary-card\">
+    <section class=\"summary-grid\">
+      <div class=\"card summary-card kpi-card\">
         <div class=\"metric-label\">今日净增 credit</div>
         <div id=\"totalCredit\" class=\"metric-value\">加载中...</div>
         <div id=\"hourlyCreditGain\" class=\"hourly-credit-pill\">
           <span class=\"hourly-credit-label\">本小时增量</span>
           <span id=\"hourlyCreditValue\">--</span>
         </div>
+      </div>
+
+      <div class=\"card summary-card meta-card\">
         <div id=\"summaryMeta\" class=\"summary-meta\"></div>
         <div id=\"lastUpdated\" class=\"metric-sub\"><span class=\"status-dot\"></span>最后更新时间：--</div>
       </div>
+    </section>
 
+    <section>
       <div class=\"card\">
         <div class=\"chart-title\">
           <h2>每小时 credit 增减</h2>
