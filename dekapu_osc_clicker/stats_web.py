@@ -149,10 +149,6 @@ def _build_index_html():
     }
     .hero-title { font-size: 28px; font-weight: 700; margin: 0 0 6px; }
     .hero-subtitle { color: var(--muted); margin: 0; }
-    .hero-metric {
-      margin-top: 14px; font-size: 34px; font-weight: 800; letter-spacing: .5px;
-      color: var(--text); word-break: break-all;
-    }
     .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
     .nav a, .switch button {
       color: var(--text); background: rgba(51,65,85,0.68); border: 1px solid rgba(148,163,184,0.16);
@@ -165,14 +161,45 @@ def _build_index_html():
       border-color: rgba(96,165,250,0.5);
       box-shadow: 0 10px 25px rgba(59,130,246,0.28);
     }
-    .grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+    .grid { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
     .card {
       background: var(--panel); border: 1px solid var(--panel-border); border-radius: 24px;
       padding: 24px; box-shadow: var(--shadow); backdrop-filter: blur(14px);
     }
+    .summary-card {
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      text-align: center;
+      border: 1px solid rgba(96,165,250,0.28);
+      background: linear-gradient(180deg, rgba(11, 19, 35, 0.92), rgba(15, 23, 42, 0.82));
+      box-shadow: 0 0 0 1px rgba(96,165,250,0.08) inset, 0 18px 45px rgba(15, 23, 42, 0.45);
+    }
     .metric-label { color: var(--muted); font-size: 14px; }
-    .metric-value { font-size: 42px; font-weight: 800; margin-top: 10px; letter-spacing: .5px; }
+    .metric-value { font-size: 48px; font-weight: 800; margin-top: 10px; letter-spacing: .5px; }
     .metric-sub { margin-top: 12px; color: var(--muted); line-height: 1.7; }
+    .hourly-credit-pill {
+      margin-top: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(52,211,153,0.30);
+      background: rgba(52,211,153,0.10);
+      color: #d1fae5;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .hourly-credit-label {
+      color: #9fe8cc;
+      font-weight: 500;
+    }
+    .summary-meta {
+      margin-top: 18px;
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 14px;
+    }
     .status-dot {
       display: inline-block; width: 8px; height: 8px; border-radius: 999px; margin-right: 8px;
       background: var(--accent); box-shadow: 0 0 16px rgba(52,211,153,0.8);
@@ -194,7 +221,7 @@ def _build_index_html():
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
       .hero { flex-direction: column; align-items: flex-start; }
-      .metric-value { font-size: 34px; }
+      .metric-value { font-size: 38px; }
     }
   </style>
 </head>
@@ -204,8 +231,6 @@ def _build_index_html():
       <div>
         <h1 class=\"hero-title\">实时统计面板</h1>
         <p class=\"hero-subtitle\">自动刷新今日 credit 进度与每小时增减变化</p>
-        <div class=\"metric-label\">今日净增 credit</div>
-        <div id=\"totalCredit\" class=\"hero-metric\">加载中...</div>
       </div>
       <div class=\"row nav\">
         <a href=\"/\">首页</a>
@@ -214,8 +239,14 @@ def _build_index_html():
     </section>
 
     <section class=\"grid\">
-      <div class=\"card\">
-        <div id=\"summaryMeta\" class=\"metric-sub\"></div>
+      <div class=\"card summary-card\">
+        <div class=\"metric-label\">今日净增 credit</div>
+        <div id=\"totalCredit\" class=\"metric-value\">加载中...</div>
+        <div id=\"hourlyCreditGain\" class=\"hourly-credit-pill\">
+          <span class=\"hourly-credit-label\">本小时增量</span>
+          <span id=\"hourlyCreditValue\">--</span>
+        </div>
+        <div id=\"summaryMeta\" class=\"summary-meta\"></div>
         <div id=\"lastUpdated\" class=\"metric-sub\"><span class=\"status-dot\"></span>最后更新时间：--</div>
       </div>
 
@@ -278,8 +309,7 @@ def _build_index_html():
       const values = rows.map(row => Number(row.credit || 0));
       const minValue = Math.min(...values, 0);
       const maxValue = Math.max(...values, 0);
-      const range = Math.max(maxValue - minValue, 1);
-      return { minValue, maxValue, range };
+      return { minValue, maxValue };
     }
 
     function getYPosition(value, padding, innerHeight, minValue, maxValue) {
@@ -289,10 +319,10 @@ def _build_index_html():
     function formatAxisValue(value) {
       const absValue = Math.abs(Number(value || 0));
       if (absValue >= 100000000) {
-        return `${(value / 100000000).toFixed(absValue >= 1000000000 ? 0 : 1).replace(/\.0$/, '')}亿`;
+        return `${(value / 100000000).toFixed(absValue >= 1000000000 ? 0 : 1).replace(/\\.0$/, '')}亿`;
       }
       if (absValue >= 10000) {
-        return `${(value / 10000).toFixed(absValue >= 100000 ? 0 : 1).replace(/\.0$/, '')}万`;
+        return `${(value / 10000).toFixed(absValue >= 100000 ? 0 : 1).replace(/\\.0$/, '')}万`;
       }
       return formatNumber(Math.round(value));
     }
@@ -312,11 +342,24 @@ def _build_index_html():
     }
 
     async function loadSummary() {
-      const response = await fetch('/api/today-summary');
-      const data = await response.json();
+      const [summaryResponse, hourlyResponse] = await Promise.all([
+        fetch('/api/today-summary'),
+        fetch('/api/hourly-credit'),
+      ]);
+      const data = await summaryResponse.json();
+      const hourlyData = await hourlyResponse.json();
       const nextTotalCredit = Number(data.total_credit_gained || 0);
       animateNumber('totalCredit', currentTotalCredit, nextTotalCredit);
       currentTotalCredit = nextTotalCredit;
+
+      const hourlyRows = hourlyData.rows || [];
+      const currentHour = new Date().getHours().toString().padStart(2, '0') + ':00';
+      const currentHourRow = hourlyRows.find(row => row.hour === currentHour);
+      const currentHourGain = Number((currentHourRow && currentHourRow.credit) || 0);
+      document.getElementById('hourlyCreditValue').textContent = currentHourGain > 0
+        ? `+${formatNumber(currentHourGain)}`
+        : formatNumber(currentHourGain);
+
       document.getElementById('summaryMeta').innerHTML = `快照 ${data.snapshot_count || 0} 条<br>首条：${data.first_captured_at || '--'}<br>末条：${data.last_captured_at || '--'}`;
       return data;
     }
