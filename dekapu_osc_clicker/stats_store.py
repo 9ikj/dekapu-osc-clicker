@@ -26,8 +26,9 @@ class StatsStore:
         self._initialize()
 
     def _connect(self):
-        connection = sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path, timeout=3)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout = 3000")
         return connection
 
     @staticmethod
@@ -130,6 +131,7 @@ class StatsStore:
 
     def _initialize(self):
         with self._connect() as connection:
+            connection.execute("PRAGMA journal_mode = WAL")
             self._create_table(connection)
             if self._needs_migration(connection):
                 self._migrate_schema(connection)
@@ -302,7 +304,7 @@ class StatsStore:
 
     def get_hourly_values(self, fields=None, day=None):
         requested_fields = tuple(fields or HOURLY_CHANGE_FIELDS)
-        return self._get_hourly_values(requested_fields, day=day)
+        return self._get_hourly_values_impl(requested_fields, day=day)
 
     @staticmethod
     def _normalize_hourly_fields(fields):
@@ -366,7 +368,7 @@ class StatsStore:
 
         return {"date": day_text, "fields": valid_fields, "rows": list(hour_buckets.values())}
 
-    def _get_hourly_values(self, fields, day=None):
+    def _get_hourly_values_impl(self, fields, day=None):
         valid_fields = self._normalize_hourly_fields(fields)
         day_text = day or datetime.now().strftime("%Y-%m-%d")
         hour_buckets = self._build_hour_buckets(day_text, valid_fields)

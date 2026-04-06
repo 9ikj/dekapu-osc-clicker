@@ -1,4 +1,4 @@
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from time import monotonic, sleep
 
 from .constants import DEFAULT_CLICK_DELAY_MS, DEFAULT_CLICK_PRESS_DURATION
@@ -9,6 +9,7 @@ class ClickerController:
         self.osc_client = osc_client
         self.status_callback = status_callback or (lambda _text: None)
         self.stop_event = Event()
+        self.state_lock = Lock()
         self.worker = None
         self.running = False
         self.click_delay = DEFAULT_CLICK_DELAY_MS / 1000.0
@@ -23,7 +24,8 @@ class ClickerController:
     def _click_loop(self):
         next_click_time = monotonic()
         while not self.stop_event.is_set():
-            interval = self.click_delay
+            with self.state_lock:
+                interval = self.click_delay
             now = monotonic()
             wait_time = next_click_time - now
             if wait_time > 0 and self.stop_event.wait(wait_time):
@@ -34,18 +36,24 @@ class ClickerController:
                 sleep(self.press_duration)
                 self.osc_client.release_use_right()
             except Exception as exc:
-                self.stop_event.set()
-                self.running = False
+                with self.state_lock:
+                    self.stop_event.set()
+                    self.running = False
+                    self.worker = None
                 self._set_status(f"状态：发送点击失败：{exc}")
-                break
+                return
 
             next_click_time = max(next_click_time + interval, monotonic())
+
+        with self.state_lock:
+            self.running = False
+            self.worker = None
 
     @staticmethod
     def validate_delay(raw_value):
         try:
             value = float(raw_value)
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise ValueError("点击频率必须是数字") from exc
 
         if value <= 0:
@@ -54,27 +62,42 @@ class ClickerController:
         return value / 1000.0
 
     def apply_delay(self, raw_value):
-        self.click_delay = self.validate_delay(raw_value)
-        if self.running:
+        delay = self.validate_delay(raw_value)
+        with self.state_lock:
+            self.click_delay = delay
+            running = self.running
+        if running:
             self._set_status(self._running_status_text())
-        return self.click_delay
+        return delay
 
     def start(self, raw_value):
-        if self.running:
-            return
-
-        self.click_delay = self.validate_delay(raw_value)
-        self.stop_event.clear()
-        self.worker = Thread(target=self._click_loop, daemon=True)
-        self.worker.start()
-        self.running = True
+        delay = self.validate_delay(raw_value)
+        with self.state_lock:
+            if self.running:
+                return False
+            self.click_delay = delay
+            self.stop_event.clear()
+            self.running = True
+            self.worker = Thread(target=self._click_loop, daemon=True)
+            self.worker.start()
         self._set_status(self._running_status_text())
+        return True
 
     def stop(self):
-        if not self.running:
-            self._set_status("状态：已停止")
-            return
+        with self.state_lock:
+            worker = self.worker
+            was_running = self.running
+            self.stop_event.set()
+            self.running = False
 
-        self.stop_event.set()
-        self.running = False
-        self._set_status("状态：已停止")
+        if worker is not None and worker.is_alive():
+            worker.join(timeout=self.press_duration + 0.5)
+
+        with self.state_lock:
+            if self.worker is worker:
+                self.worker = None
+
+        if was_running:
+            self._set_status("状态：已停止")
+        else:
+            self._set_status("状态：已停止")

@@ -46,7 +46,9 @@ jobs:
         run: |
           $requiredFiles = @(
             "dekapu_osc_clicker/assets/sp_assistant_icon.png",
-            "dekapu_osc_clicker/assets/sp_assistant_icon.ico"
+            "dekapu_osc_clicker/assets/sp_assistant_icon.ico",
+            "dekapu_osc_clicker/templates/index.html",
+            "dekapu_osc_clicker/templates/changes.html"
           )
 
           foreach ($file in $requiredFiles) {

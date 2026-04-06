@@ -17,18 +17,25 @@ class SingleInstanceManager:
         self.window_title = window_title
         self._mutex_handle = None
         self.is_primary_instance = False
+        self.last_error = None
 
     def start(self):
         mutex_result = self._acquire_windows_mutex()
-        if mutex_result is False or mutex_result is None:
+        if mutex_result is False:
             self.is_primary_instance = False
             return False
+        if mutex_result is None:
+            self.last_error = self.last_error or "无法初始化 Windows 单实例互斥锁，将跳过单实例保护"
+            self.is_primary_instance = True
+            return True
         self._mutex_handle = mutex_result
         self.is_primary_instance = True
+        self.last_error = None
         return True
 
     def _acquire_windows_mutex(self):
         if ctypes is None or wintypes is None:
+            self.last_error = "当前环境缺少 Windows ctypes 支持"
             return None
         try:
             kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -40,14 +47,18 @@ class SingleInstanceManager:
             ctypes.set_last_error(0)
             handle = kernel32.CreateMutexW(None, False, MUTEX_NAME)
             if not handle:
+                self.last_error = "CreateMutexW 返回空句柄"
                 return None
 
             last_error = ctypes.get_last_error()
             if last_error == ERROR_ALREADY_EXISTS:
                 kernel32.CloseHandle(handle)
+                self.last_error = None
                 return False
+            self.last_error = None
             return handle
-        except Exception:
+        except Exception as exc:
+            self.last_error = f"创建 Windows 互斥锁失败：{exc}"
             return None
 
     def notify_existing_instance(self):
@@ -63,8 +74,6 @@ class SingleInstanceManager:
             WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
             user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
             user32.EnumWindows.restype = wintypes.BOOL
-            user32.IsWindowVisible.argtypes = [wintypes.HWND]
-            user32.IsWindowVisible.restype = wintypes.BOOL
             user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
             user32.GetWindowTextLengthW.restype = ctypes.c_int
             user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
@@ -142,3 +151,4 @@ class SingleInstanceManager:
             except Exception:
                 pass
         self._mutex_handle = None
+        self.is_primary_instance = False

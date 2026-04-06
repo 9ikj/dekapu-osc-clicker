@@ -228,12 +228,13 @@ class MainWindow:
 
     def _toggle_stats_web_allow_lan(self):
         allow_lan = self.stats_web_allow_lan_var.get()
-        self.app.save_stats_web_allow_lan(allow_lan)
-        self.app.restart_stats_web()
-        if allow_lan:
-            self.set_status("状态：已立即切换统计页面访问范围，当前监听 0.0.0.0:45600")
-        else:
-            self.set_status("状态：已立即切换统计页面访问范围，当前监听 127.0.0.1:45600")
+        try:
+            host, port = self.app.set_stats_web_allow_lan(allow_lan)
+        except Exception as exc:
+            self.stats_web_allow_lan_var.set(not allow_lan)
+            messagebox.showerror("错误", f"切换统计页面访问范围失败：{exc}")
+            return
+        self.set_status(f"状态：已立即切换统计页面访问范围，当前监听 {host}:{port}")
 
     def run(self):
         self.root.mainloop()

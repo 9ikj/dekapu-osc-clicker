@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>每小时数值</title>
+  <style>
+    :root {
+      --bg: #09111f;
+      --panel: rgba(16, 24, 40, 0.78);
+      --panel-border: rgba(148, 163, 184, 0.14);
+      --text: #e5eefc;
+      --muted: #9fb0c9;
+      --primary: #60a5fa;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(59,130,246,0.20), transparent 28%),
+        radial-gradient(circle at top right, rgba(52,211,153,0.14), transparent 24%),
+        linear-gradient(180deg, #0a1221 0%, #08101d 100%);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    .hero {
+      display: flex; justify-content: space-between; gap: 16px; align-items: center;
+      margin-bottom: 20px; padding: 24px 26px;
+      border: 1px solid var(--panel-border); border-radius: 24px;
+      background: linear-gradient(135deg, rgba(17,24,39,0.88), rgba(15,23,42,0.72));
+      box-shadow: var(--shadow); backdrop-filter: blur(16px);
+    }
+    .hero h1 { margin: 0 0 6px; font-size: 28px; }
+    .hero p { margin: 0; color: var(--muted); }
+    .hero a {
+      color: var(--text); background: rgba(51,65,85,0.68); border: 1px solid rgba(148,163,184,0.16);
+      padding: 10px 15px; border-radius: 999px; text-decoration: none; transition: all .18s ease;
+    }
+    .hero a:hover { transform: translateY(-1px); background: rgba(71,85,105,0.8); }
+    .card {
+      background: var(--panel); border: 1px solid var(--panel-border); border-radius: 24px;
+      padding: 24px; box-shadow: var(--shadow); backdrop-filter: blur(14px);
+    }
+    .header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .header-row h2 { margin: 0; font-size: 22px; }
+    .muted { color: var(--muted); }
+    .table-wrap {
+      overflow: auto; border-radius: 18px; border: 1px solid rgba(148,163,184,0.12);
+      background: rgba(8,15,28,0.65);
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    thead th {
+      position: sticky; top: 0; background: rgba(15,23,42,0.95); color: #cfe0ff; font-weight: 600;
+    }
+    th, td { padding: 14px 14px; border-bottom: 1px solid rgba(148,163,184,0.10); text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:nth-child(even) { background: rgba(15,23,42,0.38); }
+    tbody tr:hover { background: rgba(30,41,59,0.55); }
+    .pill {
+      display: inline-block; padding: 6px 10px; border-radius: 999px;
+      background: rgba(96,165,250,0.12); color: #bfdbfe; border: 1px solid rgba(96,165,250,0.18);
+      font-size: 12px;
+    }
+    @media (max-width: 900px) {
+      .hero { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 640px) {
+      .wrap { padding: 14px; }
+      .hero {
+        padding: 18px;
+        border-radius: 18px;
+        gap: 12px;
+      }
+      .hero h1 { font-size: 22px; }
+      .hero p { font-size: 13px; line-height: 1.6; }
+      .hero a {
+        width: 100%;
+        text-align: center;
+      }
+      .card {
+        padding: 16px;
+        border-radius: 18px;
+      }
+      .header-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .header-row h2 { font-size: 18px; }
+      .table-wrap {
+        border-radius: 14px;
+      }
+      table { min-width: 620px; }
+      th, td {
+        padding: 12px 10px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <h1>每小时真实数值</h1>
+        <p>自动刷新 credit、credit_all、sp、sp_use 每小时最终真实值</p>
+      </div>
+      <a href="/">返回首页</a>
+    </section>
+
+    <section class="card">
+      <div class="header-row">
+        <h2>小时数值</h2>
+        <span id="lastUpdated" class="pill">最后更新时间：--</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>小时</th>
+              <th>credit</th>
+              <th>credit_all</th>
+              <th>sp</th>
+              <th>sp_use</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <script>
+    let isRefreshing = false;
+    const animatedValues = new Map();
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat('zh-CN').format(Number(value || 0));
+    }
+
+    function animateCell(cellId, toValue, duration = 500) {
+      const element = document.getElementById(cellId);
+      if (!element) {
+        return;
+      }
+      const fromValue = Number(animatedValues.get(cellId) || 0);
+      const targetValue = Number(toValue || 0);
+      const start = performance.now();
+
+      function frame(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const value = Math.round(fromValue + (targetValue - fromValue) * eased);
+        element.textContent = formatNumber(value);
+        if (progress < 1) {
+          requestAnimationFrame(frame);
+        }
+      }
+
+      animatedValues.set(cellId, targetValue);
+      requestAnimationFrame(frame);
+    }
+
+    function updateLastUpdated() {
+      const now = new Date();
+      document.getElementById('lastUpdated').textContent = `最后更新时间：${now.toLocaleTimeString('zh-CN')}`;
+    }
+
+    async function loadRows() {
+      const response = await fetch('/api/hourly-values?fields=credit,credit_all,sp,sp_use');
+      const data = await response.json();
+      const tbody = document.getElementById('rows');
+      const rows = data.rows || [];
+      const hasData = rows.some(row => Number(row.credit || 0) > 0 || Number(row.credit_all || 0) > 0 || Number(row.sp || 0) > 0 || Number(row.sp_use || 0) > 0);
+      if (!hasData) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">暂无数据，等待新日志...</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map((row, index) => `
+        <tr>
+          <td>${row.hour}</td>
+          <td id="credit-${index}">0</td>
+          <td id="credit-all-${index}">0</td>
+          <td id="sp-${index}">0</td>
+          <td id="sp-use-${index}">0</td>
+        </tr>
+      `).join('');
+      rows.forEach((row, index) => {
+        animateCell(`credit-${index}`, row.credit);
+        animateCell(`credit-all-${index}`, row.credit_all);
+        animateCell(`sp-${index}`, row.sp);
+        animateCell(`sp-use-${index}`, row.sp_use);
+      });
+    }
+
+    async function refreshRows() {
+      if (isRefreshing) {
+        return;
+      }
+      isRefreshing = true;
+      try {
+        await loadRows();
+        updateLastUpdated();
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    refreshRows();
+    setInterval(refreshRows, 5000);
+  </script>
+</body>
+</html>

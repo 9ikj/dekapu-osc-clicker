@@ -1,7 +1,11 @@
-from keyboard import add_hotkey, remove_hotkey
+try:
+    from keyboard import add_hotkey, remove_hotkey
+except Exception:  # pragma: no cover - optional runtime dependency
+    add_hotkey = None
+    remove_hotkey = None
 
 from .clicker import ClickerController
-from .constants import BASE_APP_TITLE, get_stats_db_file
+from .constants import BASE_APP_TITLE, STATS_WEB_PORT, get_stats_db_file
 from .log_monitor import LogMonitor
 from .osc_client import VRChatOSCClient
 from .settings import MAX_CLICK_DELAY_MS, MIN_CLICK_DELAY_MS, SettingsStore
@@ -50,6 +54,7 @@ class DekapuOscClickerApp:
 
     def save_languages(self, languages):
         self.settings.set_languages(languages)
+        self.log_monitor.update_selected_languages(languages)
 
     def get_send_enabled(self):
         return self.settings.get_send_enabled()
@@ -62,6 +67,12 @@ class DekapuOscClickerApp:
 
     def save_stats_web_allow_lan(self, allow_lan):
         self.settings.set_stats_web_allow_lan(allow_lan)
+
+    def set_stats_web_allow_lan(self, allow_lan):
+        self.save_stats_web_allow_lan(allow_lan)
+        self.restart_stats_web()
+        host = self.get_stats_web_bind_host()
+        return host, STATS_WEB_PORT
 
     def get_stats_web_bind_host(self):
         return "0.0.0.0" if self.get_stats_web_allow_lan() else "127.0.0.1"
@@ -112,7 +123,7 @@ class DekapuOscClickerApp:
             self.stats_web.ensure_started()
         except Exception as exc:
             if self.ui is not None:
-                self.ui.set_status(f"状态：统计页面服务启动失败：{exc}")
+                self.ui.set_status(f"状态：统计页面服务启动失败（端口 {STATS_WEB_PORT}）：{exc}")
             return False
         return True
 
@@ -138,26 +149,40 @@ class DekapuOscClickerApp:
         return started
 
     def register_hotkeys(self):
-        self.hotkey_f1 = add_hotkey("F1", lambda: self.start_clicking(self.ui.delay_var.get()))
-        self.hotkey_f2 = add_hotkey("F2", self.stop_clicking)
+        if add_hotkey is None or remove_hotkey is None:
+            if self.ui is not None:
+                self.ui.set_status("状态：当前环境缺少 keyboard 依赖，全局热键不可用，但界面仍可正常使用")
+            return False
+        try:
+            self.hotkey_f1 = add_hotkey("F1", lambda: self.start_clicking(self.ui.delay_var.get()))
+            self.hotkey_f2 = add_hotkey("F2", self.stop_clicking)
+        except Exception as exc:
+            self.remove_hotkeys()
+            if self.ui is not None:
+                self.ui.set_status(f"状态：全局热键注册失败，但界面仍可正常使用：{exc}")
+            return False
+        return True
 
     def remove_hotkeys(self):
-        if self.hotkey_f1 is not None:
+        if self.hotkey_f1 is not None and remove_hotkey is not None:
             try:
                 remove_hotkey(self.hotkey_f1)
             except Exception:
                 pass
-            self.hotkey_f1 = None
+        self.hotkey_f1 = None
 
-        if self.hotkey_f2 is not None:
+        if self.hotkey_f2 is not None and remove_hotkey is not None:
             try:
                 remove_hotkey(self.hotkey_f2)
             except Exception:
                 pass
-            self.hotkey_f2 = None
+        self.hotkey_f2 = None
 
     def start_single_instance_guard(self):
         return self.single_instance.start()
+
+    def get_single_instance_warning(self):
+        return self.single_instance.last_error
 
     def notify_existing_instance(self):
         return self.single_instance.notify_existing_instance()
@@ -183,6 +208,9 @@ def main():
 
     ui = MainWindow(app)
     app.attach_ui(ui)
+    warning = app.get_single_instance_warning()
+    if warning:
+        ui.set_status(f"状态：{warning}")
     app.start_stats_web()
     app.register_hotkeys()
     ui.apply_startup_monitoring_state(*app.try_start_saved_monitoring())

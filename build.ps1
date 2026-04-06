@@ -29,12 +29,13 @@ os.environ["DEKAPU_OSC_CLICKER_VERSION"] = r"$Version"
 }
 
 $assetsPath = Join-Path $PSScriptRoot "dekapu_osc_clicker\assets"
+$templatesPath = Join-Path $PSScriptRoot "dekapu_osc_clicker\templates"
 $iconPath = Join-Path $assetsPath "sp_assistant_icon.ico"
 $pngIconPath = Join-Path $assetsPath "sp_assistant_icon.png"
 
 python tools/generate_icon.py
 
-$requiredFiles = @($iconPath, $pngIconPath)
+$requiredFiles = @($iconPath, $pngIconPath, $templatesPath)
 foreach ($file in $requiredFiles) {
     if (-not (Test-Path $file)) {
         throw "Missing required asset: $file"
@@ -49,7 +50,8 @@ $pyinstallerArgs = @(
     "--onefile",
     "--windowed",
     "--name", "dekapu-osc-clicker",
-    "--add-data", "${assetsPath};dekapu_osc_clicker/assets"
+    "--add-data", "${assetsPath};dekapu_osc_clicker/assets",
+    "--add-data", "${templatesPath};dekapu_osc_clicker/templates"
 )
 
 if (Test-Path $iconPath) {
