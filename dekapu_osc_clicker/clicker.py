@@ -99,5 +99,3 @@ class ClickerController:
 
         if was_running:
             self._set_status("状态：已停止")
-        else:
-            self._set_status("状态：已停止")

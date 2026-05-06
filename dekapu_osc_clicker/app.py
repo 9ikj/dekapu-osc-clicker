@@ -90,7 +90,7 @@ class DekapuOscClickerApp:
 
     def start_clicking(self, raw_value):
         delay_ms = self.apply_click_delay(raw_value)
-        self.clicker.start(str(delay_ms))
+        return self.clicker.start(str(delay_ms))
 
     def stop_clicking(self):
         self.clicker.stop()

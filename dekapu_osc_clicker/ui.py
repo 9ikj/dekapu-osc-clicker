@@ -155,7 +155,9 @@ class MainWindow:
         self.root.after(0, lambda: self.set_status(text))
 
     def apply_startup_monitoring_state(self, started, error_message=None):
-        if not started and error_message:
+        if started:
+            self.set_status("状态：监听中（自动启动）")
+        elif error_message:
             self.set_status(f"状态：{error_message}")
 
     def open_stats_page(self):
@@ -186,11 +188,18 @@ class MainWindow:
                 else:
                     self.set_status(f"状态：已选择日志目录 {selected_dir}，但监控重启失败：{error}")
             else:
-                self.set_status(f"状态：已选择日志目录 {selected_dir}")
+                # 监控未运行（如首次启动因目录为空失败），尝试自动启动
+                success, error = self.app.restart_monitoring()
+                if success:
+                    self.set_status(f"状态：已选择日志目录 {selected_dir}，监控已启动")
+                else:
+                    self.set_status(f"状态：已选择日志目录 {selected_dir}，但监控启动失败：{error}")
 
     def _start_clicking(self):
         try:
-            self.app.start_clicking(self.delay_var.get())
+            result = self.app.start_clicking(self.delay_var.get())
+            if result is False:
+                messagebox.showinfo("提示", "点击已经在运行中")
         except ValueError as exc:
             messagebox.showerror("错误", str(exc))
 

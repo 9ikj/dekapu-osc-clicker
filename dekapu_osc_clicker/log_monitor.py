@@ -311,6 +311,6 @@ class LogMonitor:
             self.monitor_current_file = None
             self.monitor_current_offset = 0
             self.waiting_for_generated_url = False
-            self.language_index = 0
+            # 不重置 language_index，让重启后继续从上次的位置轮换
             self._last_error_text = None
         self._set_status("状态：已停止监听", dedupe=True)

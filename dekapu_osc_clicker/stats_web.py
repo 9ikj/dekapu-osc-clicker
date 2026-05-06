@@ -33,8 +33,11 @@ class StatsWebServer:
     def base_url(self):
         if self.server is None:
             raise RuntimeError("统计服务尚未启动")
-        _host, port = self.server.server_address
-        return f"http://127.0.0.1:{port}"
+        host, port = self.server.server_address
+        # 如果绑定到 0.0.0.0，返回 127.0.0.1 用于本地打开
+        if host == "0.0.0.0":
+            host = "127.0.0.1"
+        return f"http://{host}:{port}"
 
     def open_page(self, path="/"):
         base_url = self.ensure_started()
