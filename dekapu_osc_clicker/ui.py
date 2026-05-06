@@ -178,7 +178,15 @@ class MainWindow:
         if selected_dir:
             self.log_dir_var.set(selected_dir)
             self.app.save_log_dir(selected_dir)
-            self.set_status(f"状态：已选择日志目录 {selected_dir}")
+            # 如果监控正在运行，先停止再重启（日志文件可能已切换）
+            if self.app.is_monitoring():
+                success, error = self.app.restart_monitoring()
+                if success:
+                    self.set_status(f"状态：已选择日志目录 {selected_dir}，监控已重启")
+                else:
+                    self.set_status(f"状态：已选择日志目录 {selected_dir}，但监控重启失败：{error}")
+            else:
+                self.set_status(f"状态：已选择日志目录 {selected_dir}")
 
     def _start_clicking(self):
         try:

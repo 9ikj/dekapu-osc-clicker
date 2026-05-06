@@ -115,6 +115,20 @@ class DekapuOscClickerApp:
             return False, str(exc)
         return True, None
 
+    def is_monitoring(self):
+        worker = self.log_monitor.monitor_worker
+        return worker is not None and worker.is_alive()
+
+    def restart_monitoring(self):
+        """停止当前监控（如果有）并尝试用当前保存的日志目录重新启动。"""
+        self.stop_monitoring()
+        selected_languages = self.get_saved_languages()
+        try:
+            self.start_monitoring(selected_languages)
+            return True, None
+        except ValueError as exc:
+            return False, str(exc)
+
     def stop_monitoring(self):
         self.log_monitor.stop()
 
